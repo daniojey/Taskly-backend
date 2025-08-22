@@ -1,0 +1,35 @@
+# Игнорировать виртуальную среду
+venv/
+env/
+
+# Игнорировать скомпилированные Python файлы
+__pycache__/
+__pycache__
+cache/
+*.pyc
+*.pyo
+
+# Игнорировать файлы конфигурации среды
+*.env
+.env
+
+# Игнорировать миграции базы данных
+# **/migrations/*
+*.log
+staticfiles/
+staticfiles/*
+/staticfiles/
+**/staticfiles/
+
+
+# Игнорировать файлы IDE
+.vscode/
+.idea/
+
+# Игнорировать файлы базы данных
+db.sqlite3
+*.sqlite3
+
+# 5545345
+main/tests/__pycache__/
+media/
