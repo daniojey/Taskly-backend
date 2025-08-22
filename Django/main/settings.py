@@ -14,6 +14,9 @@ from pathlib import Path
 from decouple import config
 import dj_database_url
 from django.conf.global_settings import DATABASES
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -77,6 +80,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'main.wsgi.application'
 
+AUTH_USER_MODEL = 'users.User'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
@@ -95,7 +99,7 @@ WSGI_APPLICATION = 'main.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default='postgres://task_user:root@localhost:5432/Taskly',
+        default="postgres://task_user:root@localhost:5432/Taskly",
         conn_max_age=600,
     )
 }
