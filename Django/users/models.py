@@ -7,6 +7,11 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
+    
+    class Meta:
+        db_table = "user"
+        verbose_name = "Пользователь"
+        verbose_name_plural = "Пользователи"
 
 
 class Profile(models.Model):
@@ -23,6 +28,9 @@ class Group(models.Model):
     def __str__(self):
         return self.name
     
-
+    class Meta:
+        db_table = "group"
+        verbose_name = "група"
+        verbose_name_plural = "групы"
 
 

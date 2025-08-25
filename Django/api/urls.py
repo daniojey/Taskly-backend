@@ -1,11 +1,17 @@
 from django.urls import path
+from rest_framework.routers import DefaultRouter
+
+from .views import UserProfileAPiView, UserGroupApiView
 
 app_name = "api"
 
-# urlpatterns = [
-#     path('/', admin.site.urls),
-# ]
+router = DefaultRouter()
+
+router.register("groups", UserGroupApiView, basename="groups")
+
 
 urlpatterns = [
-    # Примеры путей:
+    path("", view=UserProfileAPiView.as_view(), name="profile"),
 ]
+
+urlpatterns += router.urls
