@@ -2,7 +2,7 @@ from django.db import models
 
 
 class Project(models.Model):
-    group = models.ForeignKey("users.Group", verbose_name="project_group", on_delete=models.SET_NULL, null=True) 
+    group = models.ForeignKey("users.Group", verbose_name="project_group", on_delete=models.SET_NULL, null=True, related_name="projects") 
     title = models.CharField(max_length=130, verbose_name="project_title")
     description = models.CharField(max_length=500, verbose_name="project_description")
     create_at = models.DateTimeField(auto_now_add=True)
