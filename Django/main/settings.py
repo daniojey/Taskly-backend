@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
+    "corsheaders",
 
     'api',
     'task',
@@ -55,6 +56,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -182,3 +184,38 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
     "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
 }
+
+
+# CORS настройки
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'https://resplendent-sprinkles-4bec00.netlify.app'
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:5500",  # Разрешить запросы с этого домена
+    "http://localhost:3000",  # URL твоего React-приложения
+    'http://localhost:5173', 
+    'http://localhost:4173',
+    'https://resplendent-sprinkles-4bec00.netlify.app'
+]
+
+CORS_ALLOW_CREDENTIALS = True  # Разрешить передачу кук
+CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']  # Добавлено
+
+
+# Для поддержки старых браузеров
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
