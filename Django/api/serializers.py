@@ -28,12 +28,38 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = ["id", 'group',"group_name", "title", "description", 'create_at']
 
     def validate(self, attrs):
-        if hasattr(attrs, 'group'):
+        print(attrs)
+
+        if 'group' in attrs:
             return super().validate(attrs)
         else:
             raise serializers.ValidationError({
                     'group': 'You are not a member of this group.'
                 })
+        
+class TaskSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+    project_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Task
+        fields = ["id", 'group','owner','username', 'project_name','project', 'name', 'description', 'deadline', 'create_at']
+
+    def get_username(self, obj):
+        return obj.owner.username
+    
+    def get_project_name(self, obj):
+        return obj.project.title
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        context = kwargs.get('context', {})
+
+        if "method" in context and context['method'] == 'get':
+            self.fields.pop('owner')
+            self.fields.pop('project')
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:

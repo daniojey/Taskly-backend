@@ -1,12 +1,13 @@
 from django.db.models import Prefetch
+from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets, status
 from django.contrib.auth.mixins import LoginRequiredMixin
 
-from task.models import Project
+from task.models import Project, Task
 from users.models import Group, User
-from .serializers import GroupSerializer, ProjectSerializer, UserSerializer
+from .serializers import GroupSerializer, ProjectSerializer, TaskSerializer, UserSerializer
 
 class UserProfileAPiView(APIView):
 
@@ -65,6 +66,10 @@ class UserGroupApiView(LoginRequiredMixin, viewsets.ViewSet):
 
 class GroupProjectViewSet(LoginRequiredMixin, viewsets.ViewSet):
 
+    def get_object(self):
+        obj = get_object_or_404(Project.objects.select_related("group"), pk=self.kwargs.get('pk', None))
+        return obj
+
     def list(self, request, *args, **kwargs):
         queryset = request.user.user_groups.prefetch_related(
             Prefetch(
@@ -106,6 +111,23 @@ class GroupProjectViewSet(LoginRequiredMixin, viewsets.ViewSet):
 
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        serializer = ProjectSerializer(
+            instance,
+            data=request.data,
+            partial=True,
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message":"Project partially updated!", 'result': serializer.data},
+                status=status.HTTP_200_OK
+            )
+        
+        return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk=None, *args, **kwargs):
         if pk:
@@ -114,3 +136,99 @@ class GroupProjectViewSet(LoginRequiredMixin, viewsets.ViewSet):
 
             return Response({"message": "success delete project"}, status=status.HTTP_204_NO_CONTENT)
         
+
+class TaskViewSet(LoginRequiredMixin, viewsets.ViewSet):
+
+
+    def get_queryset(self):
+        project_id = self.kwargs.get('project_id', None)
+
+        if project_id:
+            tasks = Task.objects.select_related("owner", 'project').filter(project__id=project_id)
+        else:
+            tasks  = Task.objects.select_related("owner", 'project').all()
+        return tasks
+    
+    def get_project(self):
+        project_id = self.kwargs.get('project_id', None)
+
+        project = get_object_or_404(Project.objects.select_related('group'), id=project_id)
+
+        return project
+    
+    def get_object(self):
+        queryset = self.get_queryset()
+        obj = get_object_or_404(queryset, pk=self.kwargs.get('pk'))
+        return obj
+    
+    def create(self, request, *args, **kwargs):
+        project = self.get_project()
+
+        data = request.data
+        data['project'] = project.id
+        data['owner'] = request.user.id
+        data['group'] = project.group.id
+        serializer = TaskSerializer(data=data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'result': serializer.data}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if instance.owner.id != request.user.id:
+            return Response({'message': 'forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = TaskSerializer(
+            instance,
+            data=request.data,
+            partial=True,
+            context={'method': 'path'}
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message":"Task partially updated!", 'result': serializer.data},
+                status=status.HTTP_200_OK
+            )
+        
+        return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+
+        serializer = TaskSerializer(queryset, many=True, context={"method": "get"})
+
+        return Response({'result': serializer.data, 'project': kwargs.get('project_id', None)}, status=status.HTTP_200_OK)
+    
+
+    def retrieve(self, request, pk=None, *args, **kwargs):
+        if pk:
+            try:
+                task = Task.objects.get(pk=pk)
+            except Task.DoesNotExist:
+                return Response({'message': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            serializer = TaskSerializer(task, context={"method": 'get'})
+
+            return Response({'result': serializer.data}, status=status.HTTP_200_OK)
+        
+
+    def delete(self, request, pk=None, *args, **kwargs):
+        if pk:
+            try:
+                task = Task.objects.select_related("owner").get(pk=pk)
+            except Task.DoesNotExist:
+                return Response({'message': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            if task.owner.id == request.user.id:
+                task.delete()
+            else:
+                return Response({'message': 'forbidden'}, status=status.HTTP_403_FORBIDDEN)
+
+            return Response({'message':'success delete'}, status=status.HTTP_204_NO_CONTENT)
