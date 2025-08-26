@@ -92,13 +92,14 @@ class GroupSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-
         context = kwargs.get('context', None)
 
         print(context)
 
         if context and context["include_projects"] == True:
             self.fields.pop('members')
+        else:
+            self.fields.pop('projects')
 
     class Meta:
         model = Group
@@ -112,5 +113,5 @@ class GroupSerializer(serializers.ModelSerializer):
         
         
         if hasattr(obj, 'group_projects'):
-            return ProjectSerializer(obj.group_projects, many=True, context={"no_group": True}).data
-        
+            data= ProjectSerializer(obj.group_projects, many=True, context={"no_group": True}).data
+            return data

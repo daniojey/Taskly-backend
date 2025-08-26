@@ -3,6 +3,8 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets, status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 from task.models import Project, Task
@@ -21,7 +23,9 @@ class UserProfileAPiView(APIView):
             return Response({"message": "Error"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserGroupApiView(LoginRequiredMixin, viewsets.ViewSet):
+class UserGroupApiView(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     
     def list(self, request, *args, **kwargs):
         queryset = self.request.user.user_groups.all()
@@ -44,6 +48,7 @@ class UserGroupApiView(LoginRequiredMixin, viewsets.ViewSet):
     
     def create(self, request, *args, **kwargs):
         data = request.data
+        print(data)
 
         serializer = GroupSerializer(data=data)
 
@@ -64,7 +69,9 @@ class UserGroupApiView(LoginRequiredMixin, viewsets.ViewSet):
         
 
 
-class GroupProjectViewSet(LoginRequiredMixin, viewsets.ViewSet):
+class GroupProjectViewSet(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
     def get_object(self):
         obj = get_object_or_404(Project.objects.select_related("group"), pk=self.kwargs.get('pk', None))
@@ -79,7 +86,7 @@ class GroupProjectViewSet(LoginRequiredMixin, viewsets.ViewSet):
             )
         ).all()
 
-        print(queryset)
+        print("QUERYSET",queryset)
 
         serializer = GroupSerializer(queryset, many=True, context={"include_projects": True})
 
@@ -137,7 +144,9 @@ class GroupProjectViewSet(LoginRequiredMixin, viewsets.ViewSet):
             return Response({"message": "success delete project"}, status=status.HTTP_204_NO_CONTENT)
         
 
-class TaskViewSet(LoginRequiredMixin, viewsets.ViewSet):
+class TaskViewSet(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
 
     def get_queryset(self):
