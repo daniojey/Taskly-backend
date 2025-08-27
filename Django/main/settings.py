@@ -66,6 +66,9 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'main.urls'
 
+
+
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -217,5 +220,13 @@ CORS_ALLOW_HEADERS = [
     'origin',
     'user-agent',
     'x-csrftoken',
+    'csrftoken',
     'x-requested-with',
 ]
+
+CSRF_COOKIE_HTTPONLY = False 
+CSRF_COOKIE_NAME = 'csrftoken'
+CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = False
+CSRF_USE_SESSIONS = False

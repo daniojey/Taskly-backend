@@ -1,15 +1,75 @@
 from django.db.models import Prefetch
+from django.http import JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.views import TokenVerifyView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
 from django.contrib.auth.mixins import LoginRequiredMixin
 
 from task.models import Project, Task
 from users.models import Group, User
 from .serializers import GroupSerializer, ProjectSerializer, TaskSerializer, UserSerializer
+from api import serializers
+
+
+
+from django.views.decorators.csrf import ensure_csrf_cookie
+
+@ensure_csrf_cookie
+def csrf(request, *args, **kwargs):
+    csrf_token = get_token(request)
+    # Возвращаем токен в JSON и устанавливаем куки
+    response = JsonResponse({'csrfToken': 'ok'})
+    response.set_cookie(
+        'csrftoken',
+        csrf_token,
+        max_age=3600,
+        secure=False,  # True в production с HTTPS
+        samesite='Lax',
+    )
+    return response
+
+# class GetCSRFToken(APIView):
+#     def get(self, request, *args, **kwargs):
+#         token = get_token(request)
+#         return Response({'csrfToken': token})
+    
+class CustomTokenVerifyView(TokenVerifyView):
+    def post(self, request, *args, **kwargs):
+        token = request.data.get('token')
+
+        if not token:
+            return Response(
+                {"error": 'Token not found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            access_token = AccessToken(token)
+            user_id = access_token.get('user_id')
+
+            user = User.objects.get(id=user_id)
+            user_data = serializers.UserSerializer(user).data
+
+            return Response(
+                {"message": "Token is valid", "user": user_data},
+                status=status.HTTP_200_OK,
+            )
+        
+        except TokenError as e:
+            print("ОШИБКА ТОКЕНА")
+            raise InvalidToken(e.args[0])
+        except User.DoesNotExist:
+            print("ПОЛЬЗОВАТЕЛЬ НЕ НАЙДЕН")
+            return Response(
+                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
+            )
 
 class UserProfileAPiView(APIView):
 
