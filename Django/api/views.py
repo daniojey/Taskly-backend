@@ -88,9 +88,32 @@ class UserGroupApiView(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
     
     def list(self, request, *args, **kwargs):
-        queryset = self.request.user.user_groups.all()
+        filter_projects = request.GET.get('f')
+        
+        match filter_projects:
+            case 'A-z':
+                order_by = 'name'
+            case 'Z-a':
+                order_by = '-name'
+            case 'created':
+                order_by = '-created_at'
+            case _:
+                order_by = 'created_at'
 
-        serializer = GroupSerializer(queryset, many=True)
+
+        queryset = request.user.user_groups.prefetch_related(
+            Prefetch(
+                "projects",
+                queryset=Project.objects.all().select_related("group"),
+                to_attr="group_projects"
+            )
+        ).order_by(order_by).all()
+
+        # print("QUERYSET",queryset.group_projects)
+        # for g in queryset:
+        #     print(g.group_projects)
+
+        serializer = GroupSerializer(queryset, many=True, context={"include_projects": True})
 
         return Response({"result": serializer.data}, status=status.HTTP_200_OK)
     
@@ -100,7 +123,7 @@ class UserGroupApiView(viewsets.ViewSet):
             group = Group.objects.get(pk=pk)
 
             if user.id in group.members.all().values_list("id", flat=True):
-                serializer = GroupSerializer(group)
+                serializer = GroupSerializer(group, context={"include_projects": True , 'include_tasks': True, 'count_tasks': 2})
 
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
             else:

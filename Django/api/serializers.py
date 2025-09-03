@@ -1,3 +1,4 @@
+from datetime import datetime
 from tokenize import group
 from rest_framework import serializers
 
@@ -7,6 +8,8 @@ from task.models import Project, Task
 
 class ProjectSerializer(serializers.ModelSerializer):
     group_name = serializers.SerializerMethodField()
+    create_at = serializers.SerializerMethodField()
+    tasks = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -15,6 +18,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if context and "no_group" in context:
             self.fields.pop('group')
+
+        if context and "include_tasks" not in context:
+            self.fields.pop('tasks')
             
 
     def get_group_name(self, obj):
@@ -22,10 +28,23 @@ class ProjectSerializer(serializers.ModelSerializer):
             return obj.group.name
         else:
             return None
+        
+    def get_tasks(self, obj):
+        count = self.context.get('count_tasks', None)
+
+        if count:
+            data = TaskSerializer(obj.tasks.all()[:count], many=True, context={'method': 'get'}).data
+        else:
+            data = TaskSerializer(obj.tasks.all(), many=True, context={'method': 'get'}).data
+        # print(obj.tasks.all())
+        return data 
+    
+    def get_create_at(self, obj):
+        return obj.create_at.strftime("%m/%d/%Y")
 
     class Meta:
         model = Project
-        fields = ["id", 'group',"group_name", "title", "description", 'create_at']
+        fields = ["id", 'group',"group_name", "title", "description", 'create_at', 'tasks']
 
     def validate(self, attrs):
         print(attrs)
@@ -40,6 +59,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
+    deadline = serializers.SerializerMethodField()
+    create_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
@@ -50,6 +71,12 @@ class TaskSerializer(serializers.ModelSerializer):
     
     def get_project_name(self, obj):
         return obj.project.title
+    
+    def get_deadline(self, obj):
+        return obj.deadline.strftime("%m/%d/%Y")
+    
+    def get_create_at(self, obj):
+        return obj.create_at.strftime("%m/%d/%Y")
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -64,7 +91,7 @@ class TaskSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email']
 
     def __init__(self,*args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -96,10 +123,9 @@ class GroupSerializer(serializers.ModelSerializer):
 
         print(context)
 
-        if context and context["include_projects"] == True:
-            self.fields.pop('members')
-        else:
-            self.fields.pop('projects')
+        # if context and context["include_projects"] == True:
+            # self.fields.pop('members')
+            # self.fields.pop('projects')
 
     class Meta:
         model = Group
@@ -114,4 +140,16 @@ class GroupSerializer(serializers.ModelSerializer):
         
         if hasattr(obj, 'group_projects'):
             data= ProjectSerializer(obj.group_projects, many=True, context={"no_group": True}).data
+            return data
+        
+        if hasattr(obj, 'projects'):
+            if self.context.get('include_tasks', None):
+                count = self.context.get('count_tasks', None)
+
+                if count:
+                    data = ProjectSerializer(obj.projects.all(), many=True,  context={"no_group": True, 'include_tasks': True, 'count_tasks': count}).data
+                else:
+                    data = ProjectSerializer(obj.projects.all(), many=True,  context={"no_group": True, 'include_tasks': True}).data
+            else:
+                data = ProjectSerializer(obj.projects.all(), many=True,  context={"no_group": True}).data
             return data
