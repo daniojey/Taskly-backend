@@ -1,5 +1,6 @@
 from datetime import datetime
 from tokenize import group
+from django.utils import timezone
 from rest_framework import serializers
 
 from users.models import Group, User
@@ -64,7 +65,19 @@ class TaskSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Task
-        fields = ["id", 'group','owner','username', 'project_name','project', 'name', 'description', 'deadline', 'create_at']
+        fields = [
+            "id", 
+            'group',
+            'owner',
+            'username', 
+            'project_name',
+            'project', 
+            'name', 
+            'description', 
+            'deadline', 
+            'create_at', 
+            'status'
+        ]
 
     def get_username(self, obj):
         return obj.owner.username
@@ -89,9 +102,28 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    image_profile_url = serializers.SerializerMethodField()
+    last_login = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'username', 'email']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'image_profile', 'image_profile_url', 'last_login']
+
+    def get_image_profile_url(self, obj):
+
+        if obj.image_profile and hasattr(obj.image_profile, 'url'):
+            request = self.context.get('request', None)
+
+            if request:
+                return request.build_absolute_uri(obj.image_profile.url)
+            return obj.image_profile.url
+        
+    def get_last_login(self, obj):
+        
+        print(timezone.localtime())
+        localtime = timezone.localtime(obj.last_login)
+        print(localtime)
+        return localtime.strftime("%m/%d/%Y, %H:%M")
 
     def __init__(self,*args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -105,7 +137,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class GroupSerializer(serializers.ModelSerializer):
-    members = UserSerializer(many=True, read_only=True)
+    # members = UserSerializer(many=True, read_only=True)
+    members = serializers.SerializerMethodField()
 
     members_ids = serializers.PrimaryKeyRelatedField(
         many=True,
@@ -130,6 +163,18 @@ class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = ["id", "name", "members", "members_ids", "projects"]
+
+
+    def get_members(self, obj):
+
+        request = self.context.get('request', None)
+
+        if request:
+            data = UserSerializer(obj.members.all(), many=True, context={'request': request}).data
+        else:
+            data = UserSerializer(obj.members.all(), many=True).data
+
+        return data
 
     
     def get_projects(self, obj):

@@ -12,6 +12,17 @@ class Project(models.Model):
 
 
 class Task(models.Model):
+    NO_STATUS = 'NS'
+    BASE_STATUS = 'BS'
+    URGENT_STATUS = 'US'
+
+    STATUS_TASK = [
+        (NO_STATUS, 'No Status'),
+        (BASE_STATUS, 'Active task'),
+        (URGENT_STATUS, 'Urgent task'),
+    ]
+
+    status = models.CharField(choices=STATUS_TASK, verbose_name="task_status")
     group = models.ForeignKey("users.Group", verbose_name="project_group", on_delete=models.CASCADE, related_name="tasks") 
     owner = models.ForeignKey("users.User", verbose_name="task_owner", on_delete=models.CASCADE, related_name="owner")
     project = models.ForeignKey("task.Project", verbose_name="task_from_project", on_delete=models.CASCADE, related_name="tasks")

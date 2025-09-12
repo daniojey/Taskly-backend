@@ -11,6 +11,7 @@ from rest_framework_simplejwt.views import TokenVerifyView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
 from django.contrib.auth.mixins import LoginRequiredMixin
+from rest_framework.decorators import action
 
 from task.models import Project, Task
 from users.models import Group, User
@@ -123,7 +124,7 @@ class UserGroupApiView(viewsets.ViewSet):
             group = Group.objects.get(pk=pk)
 
             if user.id in group.members.all().values_list("id", flat=True):
-                serializer = GroupSerializer(group, context={"include_projects": True , 'include_tasks': True, 'count_tasks': 2})
+                serializer = GroupSerializer(group, context={"include_projects": True , 'include_tasks': True, 'count_tasks': 2, 'request': request})
 
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
             else:
@@ -298,6 +299,23 @@ class TaskViewSet(viewsets.ViewSet):
 
         return Response({'result': serializer.data, 'project': kwargs.get('project_id', None)}, status=status.HTTP_200_OK)
     
+    @action(detail=True, methods=['post'])
+    def update_status(self, request, pk=None, *args, **kwargs):
+        print(pk)
+
+        task = Task.objects.get(pk=pk)
+        print(task)
+        print(task.status)
+
+        data = request.data
+
+        new_status = data.get('new_status', None)
+
+        if new_status and task.status != new_status:
+            task.status = new_status
+            task.save()
+
+        return Response({'result': task.status}, status=status.HTTP_200_OK)
 
     def retrieve(self, request, pk=None, *args, **kwargs):
         if pk:
