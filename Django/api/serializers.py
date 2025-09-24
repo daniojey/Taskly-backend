@@ -57,6 +57,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                     'group': 'You are not a member of this group.'
                 })
         
+class TaskCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model=Task
+        fields = '__all__'
+        
+        
 class TaskSerializer(serializers.ModelSerializer):
     username = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
@@ -86,7 +92,7 @@ class TaskSerializer(serializers.ModelSerializer):
         return obj.project.title
     
     def get_deadline(self, obj):
-        return obj.deadline.strftime("%m/%d/%Y")
+        return obj.deadline.strftime("%m/%d/%Y | %H:%M")
     
     def get_create_at(self, obj):
         return obj.create_at.strftime("%m/%d/%Y")

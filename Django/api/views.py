@@ -12,10 +12,11 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
 from django.contrib.auth.mixins import LoginRequiredMixin
 from rest_framework.decorators import action
+from rest_framework.throttling import UserRateThrottle
 
 from task.models import Project, Task
 from users.models import Group, User
-from .serializers import GroupSerializer, ProjectSerializer, TaskSerializer, UserSerializer
+from .serializers import GroupSerializer, ProjectSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
 from api import serializers
 
 
@@ -222,7 +223,12 @@ class GroupProjectViewSet(viewsets.ViewSet):
 
     def delete(self, request, pk=None, *args, **kwargs):
         if pk:
-            project = Project.objects.get(pk=pk)
+            print('PROJECT')
+            try: 
+                project = Project.objects.get(id=pk)
+            except Exception as e:
+                print('ERROR', e)
+                return Response({'message': 'error delete'}, status=status.HTTP_400_BAD_REQUEST)
             project.delete()
 
             return Response({"message": "success delete project"}, status=status.HTTP_204_NO_CONTENT)
@@ -231,6 +237,7 @@ class GroupProjectViewSet(viewsets.ViewSet):
 class TaskViewSet(viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
 
 
     def get_queryset(self):
@@ -261,7 +268,7 @@ class TaskViewSet(viewsets.ViewSet):
         data['project'] = project.id
         data['owner'] = request.user.id
         data['group'] = project.group.id
-        serializer = TaskSerializer(data=data)
+        serializer = TaskCreateSerializer(data=data)
 
         if serializer.is_valid():
             serializer.save()

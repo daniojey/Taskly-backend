@@ -22,6 +22,7 @@ router = DefaultRouter()
 router.register("groups", UserGroupApiView, basename="groups")
 router.register("groups-projects", GroupProjectViewSet, basename="groups-projects")
 router.register(r'projects/(?P<project_id>\d+)/tasks', TaskViewSet, basename='task')
+router.register('tasks', TaskViewSet, basename='tasks')
 
 
 urlpatterns = [
