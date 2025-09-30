@@ -13,6 +13,8 @@ from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
 from django.contrib.auth.mixins import LoginRequiredMixin
 from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from task.models import Project, Task
 from users.models import Group, User
@@ -321,6 +323,9 @@ class TaskViewSet(viewsets.ViewSet):
         if new_status and task.status != new_status:
             task.status = new_status
             task.save()
+
+        chanel_layer = get_channel_layer()
+        async_to_sync(chanel_layer.group_send)('chat_bobiks', {'type': 'chat_message', 'message': 'lobzik', 'datas': 'data1'})
 
         return Response({'result': task.status}, status=status.HTTP_200_OK)
 

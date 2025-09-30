@@ -25,6 +25,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     re_path(r'^api/(?P<version>(v1|v2))/', include("api.urls", namespace='api')),
+    path('tasks/', include('task.urls', namespace='task'))
 ]
 
 
