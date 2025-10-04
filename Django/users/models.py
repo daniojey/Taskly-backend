@@ -15,6 +15,18 @@ class User(AbstractUser):
         verbose_name_plural = "Пользователи"
 
 
+class Notification(models.Model):
+    user = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name='пользователь')
+    message = models.TextField(max_length=500, verbose_name='текс')
+    date_created = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+
+    class Meta:
+        db_table = 'notify'
+        verbose_name = 'Уведомление'
+        verbose_name_plural = 'Уведомления'
+
+
+
 class Profile(models.Model):
     user = models.OneToOneField("User", verbose_name="user_profile", on_delete=models.CASCADE, related_name="userprofile")
 

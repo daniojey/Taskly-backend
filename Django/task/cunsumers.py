@@ -1,11 +1,14 @@
 import json
 from time import sleep
 from random import randint
+from asgiref.sync import async_to_sync
 
 from channels.db import database_sync_to_async
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+from task.models import Task
+from users.utils import create_notify_users
 from users.models import Group
 
 class intConsumer(AsyncWebsocketConsumer):
@@ -72,3 +75,39 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Send message to WebSocket
         await self.send(text_data=json.dumps({"message": message}))
+
+
+
+class NotifiConsumer(AsyncWebsocketConsumer):
+
+    async def connect(self):
+        user = self.scope['user']
+        print(user)
+
+        if user.is_authenticated:
+            print('ПОЛЬЗОВАТЕЛЬ АУТЕНТИФИЦИРОВАН')
+            await self.channel_layer.group_add(f'chat_{user.id}', self.channel_name)
+            await self.accept()
+
+        
+    async def chat_message(self, event):
+        message = event.get('message', None)
+        task_id = event.get('task_id', None)
+
+        if task_id:
+            print("СОобщение ", message)
+            user = self.scope['user']
+            members = await self.get_groups(task_id=task_id)
+
+
+        await self.send(text_data=json.dumps({"message": message}))
+
+    @database_sync_to_async
+    def get_groups(self, task_id):
+        task = Task.objects.select_related('group').get(id=task_id)
+
+        print(task.group)
+
+        members = task.group.members.all()
+
+        print(members)

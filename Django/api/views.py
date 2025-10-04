@@ -16,6 +16,7 @@ from rest_framework.throttling import UserRateThrottle
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
+from users.utils import create_notify_users
 from task.models import Project, Task
 from users.models import Group, User
 from .serializers import GroupSerializer, ProjectSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
@@ -310,11 +311,10 @@ class TaskViewSet(viewsets.ViewSet):
     
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None, *args, **kwargs):
+        user = request.user
         print(pk)
 
-        task = Task.objects.get(pk=pk)
-        print(task)
-        print(task.status)
+        task = Task.objects.select_related('group').get(pk=pk)
 
         data = request.data
 
@@ -324,8 +324,11 @@ class TaskViewSet(viewsets.ViewSet):
             task.status = new_status
             task.save()
 
-        chanel_layer = get_channel_layer()
-        async_to_sync(chanel_layer.group_send)('chat_bobiks', {'type': 'chat_message', 'message': 'lobzik', 'datas': 'data1'})
+
+        print(user)
+        create_notify_users(group=task.group, task_name=task.name, task_status=task.status)
+        # chanel_layer = get_channel_layer()
+        # async_to_sync(chanel_layer.group_send)(f"base_group_{user.id}", {'type': 'chat_message', 'message': 'lobzik', 'datas': 'data1', 'task_id': task.id})
 
         return Response({'result': task.status}, status=status.HTTP_200_OK)
 

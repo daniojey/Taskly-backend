@@ -126,9 +126,7 @@ class UserSerializer(serializers.ModelSerializer):
         
     def get_last_login(self, obj):
         
-        print(timezone.localtime())
         localtime = timezone.localtime(obj.last_login)
-        print(localtime)
         return localtime.strftime("%m/%d/%Y, %H:%M")
 
     def __init__(self,*args, **kwargs):
