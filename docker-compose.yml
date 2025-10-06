@@ -1,0 +1,60 @@
+services:
+
+  web:
+    env_file:
+      - .env
+    build: 
+      context: .
+    networks:
+      - app-network
+    ports:
+      - "8000:8000"
+    
+    environment:
+      DATABASE_URL: postgres://task_user:root@db:5432/Taskly
+      REDIS_HOST: redis
+    depends_on:
+      db:
+       condition: service_healthy
+
+  db:
+    restart: always
+    image: postgres
+    environment:
+      POSTGRES_DB: Taskly
+      POSTGRES_USER: task_user
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U task_user -d Taskly"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    restart: always
+    image: redis:7
+    # healthcheck:
+    #   test: ["CMD", "redis-cli", "ping"]
+    #   interval: 5s
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    depends_on:
+      db: 
+        condition: service_healthy
+
+networks:
+  app-network:
+    driver: bridge
+
+
+volumes:
+  db_data:

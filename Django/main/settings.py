@@ -55,13 +55,14 @@ INSTALLED_APPS = [
     'users',
 ]
 
+REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
 
 ASGI_APPLICATION = "main.asgi.application"
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [(REDIS_HOST, 6379)],
         },
     },
 }
