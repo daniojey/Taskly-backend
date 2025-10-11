@@ -1,5 +1,6 @@
 from datetime import datetime
 from tokenize import group
+from django.db.models import Count
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -195,10 +196,12 @@ class GroupSerializer(serializers.ModelSerializer):
             if self.context.get('include_tasks', None):
                 count = self.context.get('count_tasks', None)
 
+                query = obj.projects.all().annotate(count_tasks = Count('tasks')).order_by('-count_tasks')
+
                 if count:
-                    data = ProjectSerializer(obj.projects.all(), many=True,  context={"no_group": True, 'include_tasks': True, 'count_tasks': count}).data
+                    data = ProjectSerializer(query, many=True,  context={"no_group": True, 'include_tasks': True, 'count_tasks': count}).data
                 else:
-                    data = ProjectSerializer(obj.projects.all(), many=True,  context={"no_group": True, 'include_tasks': True}).data
+                    data = ProjectSerializer(query, many=True,  context={"no_group": True, 'include_tasks': True}).data
             else:
-                data = ProjectSerializer(obj.projects.all(), many=True,  context={"no_group": True}).data
+                data = ProjectSerializer(query, many=True,  context={"no_group": True}).data
             return data

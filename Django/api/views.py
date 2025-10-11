@@ -1,4 +1,4 @@
-from django.db.models import Prefetch
+from django.db.models import Count, Prefetch
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
@@ -109,7 +109,9 @@ class UserGroupApiView(viewsets.ViewSet):
         queryset = request.user.user_groups.prefetch_related(
             Prefetch(
                 "projects",
-                queryset=Project.objects.all().select_related("group"),
+                queryset=Project.objects.all().annotate(
+                    task_count=Count('tasks')
+                ).select_related("group").order_by('-task_count'),
                 to_attr="group_projects"
             )
         ).order_by(order_by).all()
