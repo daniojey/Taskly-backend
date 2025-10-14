@@ -10,16 +10,15 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.views import TokenVerifyView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
-from django.contrib.auth.mixins import LoginRequiredMixin
 from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
+from rest_framework.pagination import PageNumberPagination
 
+from api.paginators import NotificationPaginator
 from users.utils import create_notify_users
 from task.models import Project, Task
-from users.models import Group, User
-from .serializers import GroupSerializer, ProjectSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
+from users.models import Group, Notification, User
+from .serializers import GroupSerializer, NotificationSerializer, ProjectSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
 from api import serializers
 
 
@@ -359,3 +358,26 @@ class TaskViewSet(viewsets.ViewSet):
                 return Response({'message': 'forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
             return Response({'message':'success delete'}, status=status.HTTP_204_NO_CONTENT)
+
+
+class NotificationViewSet(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        print(request.user)
+
+        notifivations = Notification.objects.filter(user=request.user)
+
+        paginator = NotificationPaginator()
+
+        result = paginator.paginate_queryset(notifivations, request)
+        print(result)
+
+        if result:
+            serializer = NotificationSerializer(result, many=True)
+
+            return paginator.get_paginated_response(serializer.data)
+
+        
+        return Response({'result': []}, status=status.HTTP_200_OK)

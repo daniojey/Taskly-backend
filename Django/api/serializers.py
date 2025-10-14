@@ -4,7 +4,7 @@ from django.db.models import Count
 from django.utils import timezone
 from rest_framework import serializers
 
-from users.models import Group, User
+from users.models import Group, Notification, User
 from task.models import Project, Task
 
 
@@ -205,3 +205,18 @@ class GroupSerializer(serializers.ModelSerializer):
             else:
                 data = ProjectSerializer(query, many=True,  context={"no_group": True}).data
             return data
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'message', 'date_created', 'user']
+
+
+    def get_user(self, obj):
+        user = UserSerializer(obj.user).data
+
+        return user

@@ -8,6 +8,7 @@ from rest_framework_simplejwt.views import (
 
 from .views import (
     CustomTokenVerifyView,
+    NotificationViewSet,
     TaskViewSet, 
     UserProfileAPiView, 
     UserGroupApiView, 
@@ -23,6 +24,7 @@ router.register("groups", UserGroupApiView, basename="groups")
 router.register("groups-projects", GroupProjectViewSet, basename="groups-projects")
 router.register(r'projects/(?P<project_id>\d+)/tasks', TaskViewSet, basename='task')
 router.register('tasks', TaskViewSet, basename='tasks')
+router.register('notifications', NotificationViewSet, basename='notification')
 
 
 urlpatterns = [
