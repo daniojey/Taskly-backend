@@ -29,7 +29,7 @@ class Notification(models.Model):
 
 class Profile(models.Model):
     user = models.OneToOneField("User", verbose_name="user_profile", on_delete=models.CASCADE, related_name="userprofile")
-
+    
     def __str__(self):
         return f"{self.user.username} Profile"
     

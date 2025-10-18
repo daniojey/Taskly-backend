@@ -210,13 +210,18 @@ class GroupSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
 
     user = serializers.SerializerMethodField()
+    created_date = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
-        fields = ['id', 'message', 'date_created', 'user']
+        fields = ['id', 'message', 'date_created','created_date', 'user']
 
 
     def get_user(self, obj):
         user = UserSerializer(obj.user).data
 
         return user
+    
+    def get_created_date(self, obj):
+        localtime = timezone.localtime(obj.date_created)
+        return localtime.strftime("%m/%d/%Y, %H:%M")

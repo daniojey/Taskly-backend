@@ -365,19 +365,14 @@ class NotificationViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
-        print(request.user)
-
-        notifivations = Notification.objects.filter(user=request.user)
+        notifivations = Notification.objects.filter(user=request.user).order_by('date_created')
 
         paginator = NotificationPaginator()
 
         result = paginator.paginate_queryset(notifivations, request)
-        print(result)
 
         if result:
             serializer = NotificationSerializer(result, many=True)
-
             return paginator.get_paginated_response(serializer.data)
-
         
         return Response({'result': []}, status=status.HTTP_200_OK)

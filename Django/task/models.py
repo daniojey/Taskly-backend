@@ -33,3 +33,25 @@ class Task(models.Model):
 
     def __str__(self):
         return f"{self.owner} - {self.project} - {self.name}"
+    
+
+class TaskChat(models.Model):
+    task = models.OneToOneField(Task, on_delete=models.CASCADE, verbose_name='chat')
+
+
+    class Meta:
+        db_table = 'chat_task'
+        verbose_name = 'Task Chat'
+        verbose_name_plural = 'Task Chats'
+
+
+
+class TaskChatMessage(models.Model):
+    chat = models.ForeignKey(TaskChat, on_delete=models.CASCADE, verbose_name='messages')
+    text = models.CharField(max_length=700, verbose_name='text_message')
+    date_add = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'task_chat_message'
+        verbose_name = 'Chat Message'
+        verbose_name_plural = 'Chat Messages'
