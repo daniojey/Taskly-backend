@@ -48,6 +48,7 @@ class TaskChat(models.Model):
 
 class TaskChatMessage(models.Model):
     chat = models.ForeignKey(TaskChat, on_delete=models.CASCADE, verbose_name='messages')
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, verbose_name='user_messages')
     text = models.CharField(max_length=700, verbose_name='text_message')
     date_add = models.DateTimeField(auto_now_add=True)
 

@@ -7,9 +7,10 @@ from channels.db import database_sync_to_async
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-from task.models import Task
+from api.serializers import UserSerializer
+from task.models import Task, TaskChat, TaskChatMessage
 from users.utils import create_notify_users
-from users.models import Group
+from users.models import Group, Notification
 
 class intConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -35,22 +36,32 @@ class intConsumer(AsyncWebsocketConsumer):
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
-        self.room_group_name = f"chat_{self.room_name}"
+        self.room_group_name = f"task_chat_{self.room_name}"
 
         # Join room group
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
 
         user = self.scope['user']
 
-        groups = await self.get_groups(user)
-        for group in groups:
-            print(group.name)
+        # groups = await self.get_groups(user)
+        # for group in groups:
+        #     print(group.name)
 
         await self.accept()
 
     @database_sync_to_async
     def get_groups(self, user):
         return list(Group.objects.filter(members__in=[user]))
+    
+    @database_sync_to_async
+    def create_notification(self, task_id, message, user):
+        task_chat = TaskChat.objects.get(task__id=task_id)
+
+        TaskChatMessage.objects.create(
+            chat=task_chat,
+            user=user,
+            text=message
+        )
 
     async def disconnect(self, close_code):
         # Leave room group
@@ -61,20 +72,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json["message"]
 
-        user = self.scope['user']
-        print('ПОльзователь', user)
+        user = UserSerializer(self.scope['user']).data
+        # print('ПОльзователь', user)
+
+        await self.create_notification(task_id=text_data_json['taskID'], user=self.scope['user'], message=message)
 
         # Send message to room group
         await self.channel_layer.group_send(
-            self.room_group_name, {"type": "chat.message", "message": message}
+            self.room_group_name, {"type": "chat.message", "message": message, 'user': user}
         )
 
     # Receive message from room group
     async def chat_message(self, event):
         message = event["message"]
+        user = event['user']
 
         # Send message to WebSocket
-        await self.send(text_data=json.dumps({"message": message}))
+        await self.send(text_data=json.dumps({
+                'message': message,
+                'user': user
+        }))
 
 
 

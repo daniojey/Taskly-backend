@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from users.models import Group, Notification, User
-from task.models import Project, Task
+from task.models import Project, Task, TaskChatMessage
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -225,3 +225,21 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_created_date(self, obj):
         localtime = timezone.localtime(obj.date_created)
         return localtime.strftime("%m/%d/%Y, %H:%M")
+    
+
+class TaskChatMessageSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+    message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskChatMessage
+        fields = ['text', 'user', 'date_add', 'message']
+
+
+    def get_user(self, obj):
+        user = UserSerializer(obj.user).data
+
+        return user
+    
+    def get_message(self, obj):
+        return obj.text

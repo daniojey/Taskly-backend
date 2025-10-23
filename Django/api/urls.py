@@ -5,8 +5,8 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView
 )
-
 from .views import (
+    ChatMessagesListView,
     CustomTokenVerifyView,
     NotificationViewSet,
     TaskViewSet, 
@@ -25,6 +25,7 @@ router.register("groups-projects", GroupProjectViewSet, basename="groups-project
 router.register(r'projects/(?P<project_id>\d+)/tasks', TaskViewSet, basename='task')
 router.register('tasks', TaskViewSet, basename='tasks')
 router.register('notifications', NotificationViewSet, basename='notification')
+# router.register('chat-messages', ChatMessagesListView, basename='chat-messages')
 
 
 urlpatterns = [
@@ -33,6 +34,7 @@ urlpatterns = [
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/verify/', CustomTokenVerifyView.as_view(), name='token_verify'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('chat-messages/<int:chat_id>/', ChatMessagesListView.as_view(), name='chat-messages')
 ]
 
 urlpatterns += router.urls

@@ -1,5 +1,6 @@
 
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.pagination import PageNumberPagination, CursorPagination
+
 from rest_framework.response import Response
 
 class NotificationPaginator(PageNumberPagination):
@@ -14,3 +15,9 @@ class NotificationPaginator(PageNumberPagination):
             'items_per_page': self.page_size,
             'results': data,
         })
+    
+
+class ChatMessagePaginator(CursorPagination):
+    page_size = 9
+    ordering = '-id'
+    max_page_size= 40

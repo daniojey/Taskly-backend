@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
@@ -12,13 +13,13 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
 from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
-from rest_framework.pagination import PageNumberPagination
+from rest_framework.pagination import PageNumberPagination, CursorPagination
 
-from api.paginators import NotificationPaginator
+from api.paginators import ChatMessagePaginator, NotificationPaginator
 from users.utils import create_notify_users
-from task.models import Project, Task
+from task.models import Project, Task, TaskChat, TaskChatMessage
 from users.models import Group, Notification, User
-from .serializers import GroupSerializer, NotificationSerializer, ProjectSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
+from .serializers import GroupSerializer, NotificationSerializer, ProjectSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
 from api import serializers
 
 
@@ -376,3 +377,12 @@ class NotificationViewSet(viewsets.ViewSet):
             return paginator.get_paginated_response(serializer.data)
         
         return Response({'result': []}, status=status.HTTP_200_OK)
+    
+    
+class ChatMessagesListView(ListAPIView):
+    pagination_class = ChatMessagePaginator
+    serializer_class = TaskChatMessageSerializer
+
+    def get_queryset(self):
+        chat = TaskChat.objects.get(task__pk=self.kwargs['chat_id'])
+        return TaskChatMessage.objects.select_related('user').filter(chat=chat)

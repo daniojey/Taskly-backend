@@ -121,7 +121,7 @@ AUTH_USER_MODEL = 'users.User'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default="postgres://task_user:root@localhost:5432/Taskly",
+        default="postgres://task_user:admin@localhost:5432/Taskly",
         conn_max_age=600,
     )
 }
@@ -194,14 +194,14 @@ REST_FRAMEWORK = {
 
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
-        'user': '10000/day'
+        'user': '1000000/day'
     }
 }
 
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=2),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=250),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=4),
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": False,
