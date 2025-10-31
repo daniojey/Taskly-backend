@@ -13,13 +13,12 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
 from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
-from rest_framework.pagination import PageNumberPagination, CursorPagination
 
 from api.paginators import ChatMessagePaginator, NotificationPaginator
 from users.utils import create_notify_users
-from task.models import Project, Task, TaskChat, TaskChatMessage
+from task.models import Project, Task, TaskComment
 from users.models import Group, Notification, User
-from .serializers import GroupSerializer, NotificationSerializer, ProjectSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
+from .serializers import GroupCreateSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
 from api import serializers
 
 
@@ -140,7 +139,7 @@ class UserGroupApiView(viewsets.ViewSet):
         data = request.data
         print(data)
 
-        serializer = GroupSerializer(data=data)
+        serializer = GroupCreateSerializer(data=data)
 
         if serializer.is_valid():
             serializer.save()
@@ -185,7 +184,7 @@ class GroupProjectViewSet(viewsets.ViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        serializer = ProjectSerializer(data=data)
+        serializer = ProjectCreateSerializer(data=data)
 
         if serializer.is_valid():
             serializer.save()
@@ -271,12 +270,12 @@ class TaskViewSet(viewsets.ViewSet):
 
         data = request.data
         data['project'] = project.id
-        data['owner'] = request.user.id
-        data['group'] = project.group.id
         serializer = TaskCreateSerializer(data=data)
+
 
         if serializer.is_valid():
             serializer.save()
+            
             return Response({'result': serializer.data}, status=status.HTTP_201_CREATED)
         else:
             return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -316,7 +315,7 @@ class TaskViewSet(viewsets.ViewSet):
         user = request.user
         print(pk)
 
-        task = Task.objects.select_related('group').get(pk=pk)
+        task = Task.objects.get(pk=pk)
 
         data = request.data
 
@@ -366,7 +365,7 @@ class NotificationViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
-        notifivations = Notification.objects.filter(user=request.user).order_by('date_created')
+        notifivations = Notification.objects.select_related('user').filter(user=request.user).order_by('created_at')
 
         paginator = NotificationPaginator()
 
@@ -383,6 +382,20 @@ class ChatMessagesListView(ListAPIView):
     pagination_class = ChatMessagePaginator
     serializer_class = TaskChatMessageSerializer
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
     def get_queryset(self):
-        chat = TaskChat.objects.get(task__pk=self.kwargs['chat_id'])
-        return TaskChatMessage.objects.select_related('user').filter(chat=chat)
+        # task = get_object_or_404(Task, id=self.kwargs.get('task_id', None))
+        # print(task)
+
+        return TaskComment.objects.filter(task__id=self.kwargs.get('task_id', None)).select_related('user')
+
+        # try:
+        #     chat = TaskChat.objects.get(task__pk=self.kwargs['chat_id'])
+        # except TaskChat.DoesNotExist:
+        #     raise NotFound(detail={'message': 'ChatNotExists'})
+        
+        # return TaskChatMessage.objects.select_related('user').filter(chat=chat)

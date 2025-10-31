@@ -18,6 +18,6 @@ class NotificationPaginator(PageNumberPagination):
     
 
 class ChatMessagePaginator(CursorPagination):
-    page_size = 9
+    page_size = 15
     ordering = '-id'
     max_page_size= 40

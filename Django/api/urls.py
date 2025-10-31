@@ -34,7 +34,7 @@ urlpatterns = [
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/verify/', CustomTokenVerifyView.as_view(), name='token_verify'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('chat-messages/<int:chat_id>/', ChatMessagesListView.as_view(), name='chat-messages')
+    path('chat-messages/<int:task_id>/', ChatMessagesListView.as_view(), name='chat-messages')
 ]
 
 urlpatterns += router.urls

@@ -5,12 +5,18 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from users.models import Group, Notification, User
-from task.models import Project, Task, TaskChatMessage
+from task.models import Project, Task, TaskComment
+
+
+class ProjectCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = "__all__"
 
 
 class ProjectSerializer(serializers.ModelSerializer):
     group_name = serializers.SerializerMethodField()
-    create_at = serializers.SerializerMethodField()
+    created_at = serializers.SerializerMethodField()
     tasks = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
@@ -41,15 +47,22 @@ class ProjectSerializer(serializers.ModelSerializer):
         # print(obj.tasks.all())
         return data 
     
-    def get_create_at(self, obj):
-        return obj.create_at.strftime("%m/%d/%Y")
+    def get_created_at(self, obj):
+        return obj.created_at.strftime("%m/%d/%Y")
 
     class Meta:
         model = Project
-        fields = ["id", 'group',"group_name", "title", "description", 'create_at', 'tasks']
+        fields = [
+            "id", 
+            'group',
+            "group_name", 
+            "title", 
+            "description", 
+            'created_at', 
+            'tasks'
+        ]
 
     def validate(self, attrs):
-        print(attrs)
 
         if 'group' in attrs:
             return super().validate(attrs)
@@ -58,6 +71,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     'group': 'You are not a member of this group.'
                 })
         
+
 class TaskCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model=Task
@@ -65,29 +79,23 @@ class TaskCreateSerializer(serializers.ModelSerializer):
         
         
 class TaskSerializer(serializers.ModelSerializer):
-    username = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
     deadline = serializers.SerializerMethodField()
-    create_at = serializers.SerializerMethodField()
+    created_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
         fields = [
             "id", 
-            'group',
-            'owner',
-            'username', 
             'project_name',
             'project', 
             'name', 
             'description', 
             'deadline', 
-            'create_at', 
+            'created_at', 
             'status'
         ]
 
-    def get_username(self, obj):
-        return obj.owner.username
     
     def get_project_name(self, obj):
         return obj.project.title
@@ -95,8 +103,8 @@ class TaskSerializer(serializers.ModelSerializer):
     def get_deadline(self, obj):
         return obj.deadline.strftime("%m/%d/%Y | %H:%M")
     
-    def get_create_at(self, obj):
-        return obj.create_at.strftime("%m/%d/%Y")
+    def get_created_at(self, obj):
+        return obj.created_at.strftime("%m/%d/%Y")
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -104,7 +112,6 @@ class TaskSerializer(serializers.ModelSerializer):
         context = kwargs.get('context', {})
 
         if "method" in context and context['method'] == 'get':
-            self.fields.pop('owner')
             self.fields.pop('project')
 
 
@@ -140,6 +147,10 @@ class UserSerializer(serializers.ModelSerializer):
             if is_admin == False:
                 self.fields.pop('id')
 
+class GroupCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Group
+        fields = '__all__'
 
 class GroupSerializer(serializers.ModelSerializer):
     # members = UserSerializer(many=True, read_only=True)
@@ -167,7 +178,7 @@ class GroupSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Group
-        fields = ["id", "name", "members", "members_ids", "projects"]
+        fields = ["id", "name", "members", "members_ids", "projects", 'owner']
 
 
     def get_members(self, obj):
@@ -210,20 +221,19 @@ class GroupSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
 
     user = serializers.SerializerMethodField()
-    created_date = serializers.SerializerMethodField()
+    created_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
-        fields = ['id', 'message', 'date_created','created_date', 'user']
+        fields = ['id', 'message', 'created_at', 'user']
 
 
     def get_user(self, obj):
         user = UserSerializer(obj.user).data
-
         return user
     
-    def get_created_date(self, obj):
-        localtime = timezone.localtime(obj.date_created)
+    def get_created_at(self, obj):
+        localtime = timezone.localtime(obj.created_at)
         return localtime.strftime("%m/%d/%Y, %H:%M")
     
 
@@ -232,8 +242,8 @@ class TaskChatMessageSerializer(serializers.ModelSerializer):
     message = serializers.SerializerMethodField()
 
     class Meta:
-        model = TaskChatMessage
-        fields = ['text', 'user', 'date_add', 'message']
+        model = TaskComment
+        fields = ['text', 'user', 'created_at', 'message']
 
 
     def get_user(self, obj):
