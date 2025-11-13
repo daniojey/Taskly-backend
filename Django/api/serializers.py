@@ -3,6 +3,7 @@ from tokenize import group
 from django.db.models import Count
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.exceptions import NotFound
 
 from users.models import Group, Notification, User
 from task.models import Project, Task, TaskComment
@@ -118,10 +119,23 @@ class TaskSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     image_profile_url = serializers.SerializerMethodField()
     last_login = serializers.SerializerMethodField()
+    in_group = serializers.SerializerMethodField()
+    is_invite_send = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'image_profile', 'image_profile_url', 'last_login']
+        fields = [
+            'id', 
+            'first_name', 
+            'last_name', 
+            'username', 
+            'email', 
+            'image_profile', 
+            'image_profile_url', 
+            'last_login',
+            'in_group',
+            'is_invite_send'
+        ]
 
     def get_image_profile_url(self, obj):
 
@@ -136,6 +150,20 @@ class UserSerializer(serializers.ModelSerializer):
         
         localtime = timezone.localtime(obj.last_login)
         return localtime.strftime("%m/%d/%Y, %H:%M")
+    
+    def get_in_group(self, obj):
+
+        if self.context.get('check_in_group', None):
+            return obj.in_group
+        else:
+            return False
+        
+    def get_is_invite_send(self, obj):
+        if self.context.get('check_in_group', None):
+            return obj.is_invite_send
+        else:
+            return False
+            
 
     def __init__(self,*args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -146,6 +174,10 @@ class UserSerializer(serializers.ModelSerializer):
             is_admin = context.get("is_admin", None)
             if is_admin == False:
                 self.fields.pop('id')
+
+            if not context.get('check_in_group', None):
+                self.fields.pop('in_group')
+                self.fields.pop('is_invite_send')
 
 class GroupCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -222,10 +254,11 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     user = serializers.SerializerMethodField()
     created_at = serializers.SerializerMethodField()
+    group_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
-        fields = ['id', 'message', 'created_at', 'user']
+        fields = ['id', 'message', 'created_at', 'user', 'notify_type', 'group_id']
 
 
     def get_user(self, obj):
@@ -235,6 +268,9 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_created_at(self, obj):
         localtime = timezone.localtime(obj.created_at)
         return localtime.strftime("%m/%d/%Y, %H:%M")
+    
+    def get_group_id(self, obj):
+        return obj.group_id.get('group_id', None)
     
 
 class TaskChatMessageSerializer(serializers.ModelSerializer):

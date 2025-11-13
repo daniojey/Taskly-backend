@@ -13,6 +13,7 @@ from .views import (
     UserProfileAPiView, 
     UserGroupApiView, 
     GroupProjectViewSet,
+    UserViewSet,
     csrf
 )
 
@@ -25,6 +26,7 @@ router.register("groups-projects", GroupProjectViewSet, basename="groups-project
 router.register(r'projects/(?P<project_id>\d+)/tasks', TaskViewSet, basename='task')
 router.register('tasks', TaskViewSet, basename='tasks')
 router.register('notifications', NotificationViewSet, basename='notification')
+router.register('users', UserViewSet, basename='users')
 # router.register('chat-messages', ChatMessagesListView, basename='chat-messages')
 
 

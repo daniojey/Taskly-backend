@@ -16,8 +16,18 @@ class User(AbstractUser):
 
 
 class Notification(models.Model):
+    INVITE_MESSAGE = 'Invite'
+    TASK_UPDATE_MESSAGE = 'Task status update'
+
+    TYPE_MESSAGES = [
+        (INVITE_MESSAGE, 'Invite'),
+        (TASK_UPDATE_MESSAGE, 'Task status update'),
+    ]
+
+    notify_type = models.CharField(choices=TYPE_MESSAGES, verbose_name='message type')
     user = models.ForeignKey('User', on_delete=models.CASCADE, verbose_name='user')
     message = models.TextField(max_length=500, verbose_name='text')
+    group_id = models.JSONField(verbose_name='group_id', blank=True, null=True)                     
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='created date')
     updated_at = models.DateTimeField(auto_now=True)
     is_read = models.BooleanField(default=False)

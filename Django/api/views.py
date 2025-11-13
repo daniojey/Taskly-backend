@@ -1,4 +1,5 @@
-from django.db.models import Count, Prefetch
+import json
+from django.db.models import Count, Prefetch, Exists, OuterRef
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
@@ -155,8 +156,69 @@ class UserGroupApiView(viewsets.ViewSet):
             group.delete()
 
             return Response({"message": "success delete group"}, status=status.HTTP_204_NO_CONTENT)
-        
+    
+    @action(detail=True, methods=['post'])
+    def user_invite_group(self, request, pk, *args, **kwargs):
+        print('PK', pk)
+        if pk:
+            try:
+                data = request.data
+                user_id = data.get('user_id', None)
 
+                group = get_object_or_404(Group.objects.prefetch_related('members'), pk=pk)
+                
+                if not group.members.filter(id=user_id).exists():
+                    notify = Notification(
+                        notify_type=Notification.INVITE_MESSAGE,
+                        user_id=user_id,
+                        message=f"{request.user.username} wants to add you to a group",
+                        group_id={'group_id': group.id}
+                    )
+
+                    notify.save()
+
+                    return Response({'results': 'success'}, status=status.HTTP_200_OK)
+                else:
+                    return Response({'errors': 'User already from this group'}, status=status.HTTP_400_BAD_REQUEST)
+            except Exception as e:
+                return Response({'errors': [e]}, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            return Response({'errors': 'Not found group'}, status=status.HTTP_404_NOT_FOUND)
+        
+    @action(detail=True, methods=['post'])
+    def processing_group_invite(self, request, pk=None, *args, **kwargs):
+        if not pk:
+            return Response({'results': 'none'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        
+        data = request.data
+        notify_data  = data.get('notify', None)
+        notify_user = notify_data.get('user', None)
+
+        if not notify_data and not notify_user:
+            return Response({'errors': f'Not {notify_data | notify_user}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        match (data.get('type', None)):
+            case 'accept':
+                group = get_object_or_404(Group, id=notify_data.get('group_id', None))
+                user = get_object_or_404(User, id=notify_user.get('id', None))
+                group.members.add(user)
+                group.save()
+
+                notify = get_object_or_404(Notification, id=notify_data.get('id', None))
+                notify.delete()
+                return Response({'results', 'ok'}, status=status.HTTP_200_OK)
+            
+            case 'cancel':
+                notify = get_object_or_404(Notification, id=notify_data.get('id', None))
+                notify.delete()
+                return Response({'results': 'Invitation declined'}, status=status.HTTP_200_OK)
+            
+            case _:
+                return Response({'errors': 'None error'}, status=status.HTTP_400_BAD_REQUEST)
+      
+            
 
 class GroupProjectViewSet(viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
@@ -236,7 +298,6 @@ class GroupProjectViewSet(viewsets.ViewSet):
             project.delete()
 
             return Response({"message": "success delete project"}, status=status.HTTP_204_NO_CONTENT)
-        
 
 class TaskViewSet(viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
@@ -399,3 +460,40 @@ class ChatMessagesListView(ListAPIView):
         #     raise NotFound(detail={'message': 'ChatNotExists'})
         
         # return TaskChatMessage.objects.select_related('user').filter(chat=chat)
+
+
+
+class UserViewSet(viewsets.ViewSet):
+
+    @action(methods=['post'], detail=False)
+    def search_users(self, request, *args, **kwargs):
+        data = request.data
+        group_id = data.get('group_id', None)
+        username = data.get('username', None)
+
+        user = User.objects.get(username=username)
+
+        print(user.user_groups.all())
+
+        if username:
+            users = User.objects.filter(username__icontains=username).annotate(
+                in_group=Exists(Group.objects.filter(
+                    id=group_id,
+                    members=OuterRef('pk')
+                )),
+
+                is_invite_send=Exists(Notification.objects.filter(
+                    user=OuterRef('pk'),
+                    group_id__group_id=int(group_id),
+                    notify_type=Notification.INVITE_MESSAGE
+                ))
+            )
+
+            serializer = UserSerializer(users, context={
+                'request': request, 
+                'check_in_group': True,
+            }, many=True)
+
+            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+        else:
+            return Response({'results': []}, status=status.HTTP_400_BAD_REQUEST)
