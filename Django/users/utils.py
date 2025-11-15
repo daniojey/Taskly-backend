@@ -30,7 +30,7 @@ def create_notify_user(user_id, type_message: str, notify_message: str, push_mes
         notify_type=type_message,
         user_id=user_id, 
         message=notify_message,
-        group_id={'group_id': group_id},
+        data={'group_id': group_id},
     )
 
     channel = get_channel_layer()

@@ -441,7 +441,7 @@ class NotificationViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
-        notifivations = Notification.objects.select_related('user').filter(user=request.user).order_by('created_at')
+        notifivations = Notification.objects.select_related('user').filter(user=request.user).order_by('-created_at')
 
         paginator = NotificationPaginator()
 
@@ -499,7 +499,7 @@ class UserViewSet(viewsets.ViewSet):
 
                 is_invite_send=Exists(Notification.objects.filter(
                     user=OuterRef('pk'),
-                    group_id__group_id=int(group_id),
+                    data__group_id=int(group_id),
                     notify_type=Notification.INVITE_MESSAGE
                 ))
             )

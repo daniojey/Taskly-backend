@@ -271,8 +271,8 @@ class NotificationSerializer(serializers.ModelSerializer):
     
     def get_group_id(self, obj):
 
-        if isinstance(obj.group_id, dict):
-            return obj.group_id.get('group_id', None)
+        if isinstance(obj.data, dict):
+            return obj.data.get('group_id', None)
         return None
     
 
