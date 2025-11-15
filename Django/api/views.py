@@ -16,7 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
 
 from api.paginators import ChatMessagePaginator, NotificationPaginator
-from users.utils import create_notify_users
+from users.utils import create_notify_user, create_notify_users
 from task.models import Project, Task, TaskComment
 from users.models import Group, Notification, User
 from .serializers import GroupCreateSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
@@ -168,14 +168,13 @@ class UserGroupApiView(viewsets.ViewSet):
                 group = get_object_or_404(Group.objects.prefetch_related('members'), pk=pk)
                 
                 if not group.members.filter(id=user_id).exists():
-                    notify = Notification(
-                        notify_type=Notification.INVITE_MESSAGE,
+                    create_notify_user(
                         user_id=user_id,
-                        message=f"{request.user.username} wants to add you to a group",
-                        group_id={'group_id': group.id}
+                        type_message=Notification.INVITE_MESSAGE,
+                        notify_message=f"{request.user.username} wants to add you to a group",
+                        push_message="You have been invited to join a group",
+                        group_id=group.id
                     )
-
-                    notify.save()
 
                     return Response({'results': 'success'}, status=status.HTTP_200_OK)
                 else:
@@ -217,6 +216,22 @@ class UserGroupApiView(viewsets.ViewSet):
             
             case _:
                 return Response({'errors': 'None error'}, status=status.HTTP_400_BAD_REQUEST)
+            
+    @action(detail=True, methods=['post'])
+    def delete_member(self, request, pk=None, *args, **kwargs):
+        if not pk:
+            return Response({'errors': 'Not id group'}, status=status.HTTP_404_NOT_FOUND)
+        
+        data = request.data
+        user_id = data.get('userId', None)
+
+        if user_id:
+            group = Group.objects.get(id=pk)
+
+            group.members.remove(user_id)
+            group.save()
+
+            return Response({'results': 'Member Delete!'}, status=status.HTTP_200_OK)
       
             
 

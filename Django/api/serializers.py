@@ -270,7 +270,10 @@ class NotificationSerializer(serializers.ModelSerializer):
         return localtime.strftime("%m/%d/%Y, %H:%M")
     
     def get_group_id(self, obj):
-        return obj.group_id.get('group_id', None)
+
+        if isinstance(obj.group_id, dict):
+            return obj.group_id.get('group_id', None)
+        return None
     
 
 class TaskChatMessageSerializer(serializers.ModelSerializer):
