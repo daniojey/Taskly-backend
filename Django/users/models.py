@@ -64,3 +64,30 @@ class Group(models.Model):
         verbose_name_plural = "Groups"
 
 
+
+class GroupLogs(models.Model):
+    ADD_MEMBER = 'Add member'
+    KICKED_MEMBER = 'Kicked member'
+
+    TYPE_EVENTS = [
+        (ADD_MEMBER, 'Add member'),
+        (KICKED_MEMBER, 'Kicked Member')
+    ]
+
+
+    trigger_event = models.CharField(max_length=200, verbose_name='triggered event')
+    event_type = models.CharField(choices=TYPE_EVENTS, verbose_name="event type")
+    group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='logs', verbose_name='logs')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    def __str__(self):
+        return self.event_type
+
+    class Meta:
+        db_table = 'group_logs'
+        verbose_name = 'GroupLog'
+        verbose_name_plural = 'GroupLogs'
+
+
+
