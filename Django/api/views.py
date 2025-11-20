@@ -15,11 +15,11 @@ from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
 from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
 
-from api.paginators import ChatMessagePaginator, NotificationPaginator
+from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
 from users.utils import create_notify_user, create_notify_users
 from task.models import Project, Task, TaskComment
-from users.models import Group, Notification, User
-from .serializers import GroupCreateSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
+from users.models import Group, GroupLogs, Notification, User
+from .serializers import GroupCreateSerializer, GroupLogsSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
 from api import serializers
 
 
@@ -232,6 +232,8 @@ class UserGroupApiView(viewsets.ViewSet):
             group.save()
 
             return Response({'results': 'Member Delete!'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'results': 'Not found invited user'}, status=status.HTTP_404_NOT_FOUND)
       
             
 
@@ -307,9 +309,9 @@ class GroupProjectViewSet(viewsets.ViewSet):
             print('PROJECT')
             try: 
                 project = Project.objects.get(id=pk)
-            except Exception as e:
+            except Project.DoesNotExist as e:
                 print('ERROR', e)
-                return Response({'message': 'error delete'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'message': 'error delete project'}, status=status.HTTP_400_BAD_REQUEST)
             project.delete()
 
             return Response({"message": "success delete project"}, status=status.HTTP_204_NO_CONTENT)
@@ -512,3 +514,29 @@ class UserViewSet(viewsets.ViewSet):
             return Response({'results': serializer.data}, status=status.HTTP_200_OK)
         else:
             return Response({'results': []}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+class GroupLogsViewSet(viewsets.ReadOnlyModelViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes  = [IsAuthenticated]
+
+
+    def list(self, request, *args, **kwargs):
+        group_id = kwargs.get('group_id', None)
+
+        if not group_id:
+            return Response({'errors': 'Not group Id'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        logs = GroupLogs.logmanager.group_select(group_id=group_id).optimized()
+
+        paginator = GroupLogsPaginator()
+
+        result = paginator.paginate_queryset(logs, request)
+
+        if result:
+            serializer = GroupLogsSerializer(logs, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
+        else:
+            return Response({'results': []}, status=status.HTTP_200_OK)
+        # return Response({'results': serializer.data}, status=status.HTTP_200_OK)

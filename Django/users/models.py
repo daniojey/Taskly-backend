@@ -64,22 +64,54 @@ class Group(models.Model):
         verbose_name_plural = "Groups"
 
 
+class GroupLogsQueryset(models.QuerySet):
+    
+    def optimized(self):
+
+        return self.select_related(
+            'group', 'anchor'
+        ).only(
+            'event',
+            'event_type',
+            'group__name',
+            'group__owner',
+            'created_at',
+            'anchor__username'
+        )
+
+class GroupLogsManager(models.Manager):
+
+    def get_queryset(self):
+        return GroupLogsQueryset(self.model, using=self._db)
+
+    def group_select(self, group_id):
+        return self.get_queryset().filter(group__id=group_id)
+
 
 class GroupLogs(models.Model):
     ADD_MEMBER = 'Add member'
     KICKED_MEMBER = 'Kicked member'
+    CHANGE_SETTINGS = 'Change settings'
+    INVITE_MEMBER = 'Invite member'
 
     TYPE_EVENTS = [
         (ADD_MEMBER, 'Add member'),
-        (KICKED_MEMBER, 'Kicked Member')
+        (KICKED_MEMBER, 'Kicked Member'),
+        (CHANGE_SETTINGS, 'Change settings'),
+        (INVITE_MEMBER, 'Invite member')
     ]
 
 
-    trigger_event = models.CharField(max_length=200, verbose_name='triggered event')
+    event = models.CharField(max_length=200, verbose_name='triggered event')
     event_type = models.CharField(choices=TYPE_EVENTS, verbose_name="event type")
     group = models.ForeignKey(Group, on_delete=models.CASCADE, related_name='logs', verbose_name='logs')
     created_at = models.DateTimeField(auto_now_add=True)
+    data = models.JSONField(default=dict, verbose_name='log_data', null=True)
+    anchor = models.ForeignKey('User', null=True, on_delete=models.SET_NULL, verbose_name='event_triggered', related_name='log_anchor')
 
+
+    objects = models.Manager()
+    logmanager = GroupLogsManager()
 
     def __str__(self):
         return self.event_type

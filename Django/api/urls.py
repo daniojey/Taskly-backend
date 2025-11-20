@@ -8,6 +8,7 @@ from rest_framework_simplejwt.views import (
 from .views import (
     ChatMessagesListView,
     CustomTokenVerifyView,
+    GroupLogsViewSet,
     NotificationViewSet,
     TaskViewSet, 
     UserProfileAPiView, 
@@ -22,6 +23,7 @@ app_name = "api"
 router = DefaultRouter()
 
 router.register("groups", UserGroupApiView, basename="groups")
+router.register(r'group/(?P<group_id>\d+)/logs', GroupLogsViewSet, basename='group-logs')
 router.register("groups-projects", GroupProjectViewSet, basename="groups-projects")
 router.register(r'projects/(?P<project_id>\d+)/tasks', TaskViewSet, basename='task')
 router.register('tasks', TaskViewSet, basename='tasks')
