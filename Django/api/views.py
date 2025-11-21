@@ -527,6 +527,13 @@ class GroupLogsViewSet(viewsets.ReadOnlyModelViewSet):
         if not group_id:
             return Response({'errors': 'Not group Id'}, status=status.HTTP_400_BAD_REQUEST)
         
+        group = Group.objects.select_related('owner').only(
+            'owner__id'
+        ).get(id=group_id)
+
+        if group.owner.id != request.user.id:
+            return Response({'errors': ''}, status=status.HTTP_403_FORBIDDEN)
+        
         logs = GroupLogs.logmanager.group_select(group_id=group_id).optimized()
 
         paginator = GroupLogsPaginator()
