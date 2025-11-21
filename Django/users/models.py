@@ -93,12 +93,14 @@ class GroupLogs(models.Model):
     KICKED_MEMBER = 'Kicked member'
     CHANGE_SETTINGS = 'Change settings'
     INVITE_MEMBER = 'Invite member'
+    INVITE_DEFLECTED = 'Invite deflected'
 
     TYPE_EVENTS = [
         (ADD_MEMBER, 'Add member'),
         (KICKED_MEMBER, 'Kicked Member'),
         (CHANGE_SETTINGS, 'Change settings'),
-        (INVITE_MEMBER, 'Invite member')
+        (INVITE_MEMBER, 'Invite member'),
+        (INVITE_DEFLECTED, 'Invite deflected')
     ]
 
 

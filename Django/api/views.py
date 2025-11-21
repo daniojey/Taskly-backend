@@ -15,6 +15,7 @@ from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
 from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
 
+from api.utils import GroupLogger
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
 from users.utils import create_notify_user, create_notify_users
 from task.models import Project, Task, TaskComment
@@ -68,10 +69,8 @@ class CustomTokenVerifyView(TokenVerifyView):
             )
         
         except TokenError as e:
-            print("ОШИБКА ТОКЕНА")
             raise InvalidToken(e.args[0])
         except User.DoesNotExist:
-            print("ПОЛЬЗОВАТЕЛЬ НЕ НАЙДЕН")
             return Response(
                 {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
             )
@@ -138,7 +137,6 @@ class UserGroupApiView(viewsets.ViewSet):
     
     def create(self, request, *args, **kwargs):
         data = request.data
-        print(data)
 
         serializer = GroupCreateSerializer(data=data)
 
@@ -159,7 +157,6 @@ class UserGroupApiView(viewsets.ViewSet):
     
     @action(detail=True, methods=['post'])
     def user_invite_group(self, request, pk, *args, **kwargs):
-        print('PK', pk)
         if pk:
             try:
                 data = request.data
@@ -174,6 +171,16 @@ class UserGroupApiView(viewsets.ViewSet):
                         notify_message=f"{request.user.username} wants to add you to a group",
                         push_message="You have been invited to join a group",
                         group_id=group.id
+                    )
+
+                    user = User.objects.only('id', 'username').get(id=user_id)
+
+                    GroupLogger.send_invite_member(
+                        group=group,
+                        event_type=GroupLogs.INVITE_MEMBER,
+                        target_user=user,
+                        triggered_user=request.user
+
                     )
 
                     return Response({'results': 'success'}, status=status.HTTP_200_OK)
@@ -198,12 +205,22 @@ class UserGroupApiView(viewsets.ViewSet):
         if not notify_data and not notify_user:
             return Response({'errors': f'Not {notify_data | notify_user}'}, status=status.HTTP_400_BAD_REQUEST)
 
+        group = get_object_or_404(
+                Group.objects.prefetch_related('members').only('id', 'members'), 
+                id=notify_data.get('group_id', None)
+        )
+
         match (data.get('type', None)):
             case 'accept':
-                group = get_object_or_404(Group, id=notify_data.get('group_id', None))
                 user = get_object_or_404(User, id=notify_user.get('id', None))
                 group.members.add(user)
                 group.save()
+
+                GroupLogger.add_member(
+                    group=group,
+                    event_type=GroupLogs.ADD_MEMBER,
+                    invited_user=user,
+                )
 
                 notify = get_object_or_404(Notification, id=notify_data.get('id', None))
                 notify.delete()
@@ -212,6 +229,12 @@ class UserGroupApiView(viewsets.ViewSet):
             case 'cancel':
                 notify = get_object_or_404(Notification, id=notify_data.get('id', None))
                 notify.delete()
+
+                GroupLogger.invite_deflected(
+                    group=group,
+                    event_type=GroupLogs.INVITE_DEFLECTED,
+                    target_user=notify_user.get('username', None)
+                )
                 return Response({'results': 'Invitation declined'}, status=status.HTTP_200_OK)
             
             case _:
@@ -226,10 +249,18 @@ class UserGroupApiView(viewsets.ViewSet):
         user_id = data.get('userId', None)
 
         if user_id:
+            user = User.objects.only('id', 'username').get(id=user_id)
             group = Group.objects.get(id=pk)
 
             group.members.remove(user_id)
             group.save()
+
+            GroupLogger.kick_member(
+                group=group, 
+                event_type=GroupLogs.KICKED_MEMBER,
+                kicked_user=user,
+                triggered_user=request.user
+            )
 
             return Response({'results': 'Member Delete!'}, status=status.HTTP_200_OK)
         else:
@@ -254,7 +285,6 @@ class GroupProjectViewSet(viewsets.ViewSet):
             )
         ).all()
 
-        print("QUERYSET",queryset)
 
         serializer = GroupSerializer(queryset, many=True, context={"include_projects": True})
 
@@ -306,11 +336,9 @@ class GroupProjectViewSet(viewsets.ViewSet):
 
     def delete(self, request, pk=None, *args, **kwargs):
         if pk:
-            print('PROJECT')
             try: 
                 project = Project.objects.get(id=pk)
             except Project.DoesNotExist as e:
-                print('ERROR', e)
                 return Response({'message': 'error delete project'}, status=status.HTTP_400_BAD_REQUEST)
             project.delete()
 
@@ -391,7 +419,6 @@ class TaskViewSet(viewsets.ViewSet):
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None, *args, **kwargs):
         user = request.user
-        print(pk)
 
         task = Task.objects.get(pk=pk)
 
@@ -404,7 +431,6 @@ class TaskViewSet(viewsets.ViewSet):
             task.save()
 
 
-        print(user)
         create_notify_users(group=task.group, task_name=task.name, task_status=task.status)
         # chanel_layer = get_channel_layer()
         # async_to_sync(chanel_layer.group_send)(f"base_group_{user.id}", {'type': 'chat_message', 'message': 'lobzik', 'datas': 'data1', 'task_id': task.id})
@@ -489,8 +515,6 @@ class UserViewSet(viewsets.ViewSet):
         username = data.get('username', None)
 
         user = User.objects.get(username=username)
-
-        print(user.user_groups.all())
 
         if username:
             users = User.objects.filter(username__icontains=username).annotate(
