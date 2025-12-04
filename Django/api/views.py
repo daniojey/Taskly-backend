@@ -1,8 +1,10 @@
+from datetime import date, datetime
 import json
-from django.db.models import Count, Prefetch, Exists, OuterRef
+from django.db.models import Q, Count, Prefetch, Exists, OuterRef
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
@@ -546,6 +548,7 @@ class GroupLogsViewSet(viewsets.ReadOnlyModelViewSet):
 
 
     def list(self, request, *args, **kwargs):
+        queries = request.GET
         group_id = kwargs.get('group_id', None)
 
         if not group_id:
@@ -558,7 +561,10 @@ class GroupLogsViewSet(viewsets.ReadOnlyModelViewSet):
         if group.owner.id != request.user.id:
             return Response({'errors': ''}, status=status.HTTP_403_FORBIDDEN)
         
-        logs = GroupLogs.logmanager.group_select(group_id=group_id).optimized()
+        logs = GroupLogs.logmanager.group_select(group_id=group_id)
+
+        if queries:
+            logs = GroupLogs.logmanager.filter_queries(logs, queries)
 
         paginator = GroupLogsPaginator()
 

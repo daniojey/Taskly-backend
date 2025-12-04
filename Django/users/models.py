@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+from django.utils.timezone import datetime
 
 
 class User(AbstractUser):
@@ -86,7 +88,67 @@ class GroupLogsManager(models.Manager):
 
     def group_select(self, group_id):
         return self.get_queryset().filter(group__id=group_id)
+    
+    def filter_queries(self, dataset, queries):
+        date_start = queries.get('date-start', None)
+        date_out = queries.get('date-out', None)
+        username = queries.get('username', None)
+        group_name = queries.get('group-name', None)
+        event_type = queries.get('event-type', None)
 
+        # Time filtering
+        match (date_start, date_out):
+            case (start, out) if start is not None and out is not None:
+                received_start_str = queries.get('date-start') 
+                received_out_str = queries.get('date-out')
+
+                naive_date_start = datetime.strptime(received_start_str, '%Y-%m-%dT%H:%M')
+                naive_date_out = datetime.strptime(received_out_str, '%Y-%m-%dT%H:%M')
+
+                current_tz = timezone.get_current_timezone() 
+
+                aware_date_start = timezone.make_aware(naive_date_start, current_tz)
+                aware_date_out = timezone.make_aware(naive_date_out, current_tz)
+                dataset = dataset.filter(models.Q(created_at__lte=aware_date_out) & models.Q(created_at__gte=aware_date_start))
+            case (start, None) if start is not None:
+                received_start_str = queries.get('date-start')
+                naive_date_start = datetime.strptime(received_start_str, '%Y-%m-%dT%H:%M')
+
+                current_tz = timezone.get_current_timezone() 
+                aware_date_start = timezone.make_aware(naive_date_start, current_tz)
+                dataset = dataset.filter(created_at__gte=aware_date_start)
+            case (None, out) if out is not None:
+                received_out_str = queries.get('date-out')
+                naive_date_out = datetime.strptime(received_out_str, '%Y-%m-%dT%H:%M')
+                current_tz = timezone.get_current_timezone() 
+
+                aware_date_out = timezone.make_aware(naive_date_out, current_tz)
+                dataset = dataset.filter(created_at__lte=aware_date_out)
+            case _:
+                pass
+            
+        # Username filtering
+        if username:
+            dataset = dataset.filter(anchor__username=username)
+
+        # Group name filtering
+        if group_name:
+            dataset = dataset.filter(group__name=group_name)
+
+        # filter Event type:
+        available_events = [
+            'Add member', 
+            'Kicked member', 
+            'Change settings', 
+            'Invite member', 
+            'invite deflected'
+        ]
+
+        if event_type and event_type in available_events:
+            dataset = dataset.filter(event_type=event_type)
+
+        return dataset
+            
 
 class GroupLogs(models.Model):
     ADD_MEMBER = 'Add member'
