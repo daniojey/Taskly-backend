@@ -70,7 +70,7 @@ class TaskComment(models.Model):
 class TaskImage(models.Model):
     message = models.ForeignKey(TaskComment, on_delete=models.CASCADE ,related_name='message_image')
     title = models.CharField(max_length=155)
-    url = models.ImageField(upload_to='task_images/')
+    image = models.ImageField(upload_to='task_images/')
     created_at = models.DateTimeField(auto_now_add=True)
     
 

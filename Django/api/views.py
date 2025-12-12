@@ -20,7 +20,7 @@ from rest_framework.throttling import UserRateThrottle
 from api.utils import GroupLogger
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
 from users.utils import create_notify_user, create_notify_users
-from task.models import Project, Task, TaskComment
+from task.models import Project, Task, TaskComment, TaskImage
 from users.models import Group, GroupLogs, Notification, User
 from .serializers import GroupCreateSerializer, GroupLogsSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
 from api import serializers
@@ -496,8 +496,14 @@ class ChatMessagesListView(ListAPIView):
     def get_queryset(self):
         # task = get_object_or_404(Task, id=self.kwargs.get('task_id', None))
         # print(task)
-
-        return TaskComment.objects.filter(task__id=self.kwargs.get('task_id', None)).select_related('user')
+        print('LOADING CHAT')
+        return TaskComment.objects.filter(task__id=self.kwargs.get('task_id', None)).select_related('user').prefetch_related(
+            Prefetch(
+                'message_image',
+                queryset=TaskImage.objects.all().only('message', 'image'),
+                to_attr='task_images'
+            )
+        )
 
         # try:
         #     chat = TaskChat.objects.get(task__pk=self.kwargs['chat_id'])

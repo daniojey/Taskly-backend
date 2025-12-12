@@ -1,5 +1,6 @@
 from datetime import datetime
 from tokenize import group
+import attr
 from django.db.models import Count
 from django.utils import timezone
 from rest_framework import serializers
@@ -305,10 +306,17 @@ class NotificationSerializer(serializers.ModelSerializer):
 class TaskChatMessageSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     message = serializers.SerializerMethodField()
+    images_urls = serializers.SerializerMethodField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        context = kwargs.get('context', None)
+        print(context)
 
     class Meta:
         model = TaskComment
-        fields = ['text', 'user', 'created_at', 'message']
+        fields = ['text', 'user', 'created_at', 'message', 'images_urls']
 
 
     def get_user(self, obj):
@@ -318,3 +326,21 @@ class TaskChatMessageSerializer(serializers.ModelSerializer):
     
     def get_message(self, obj):
         return obj.text
+    
+    def get_images_urls(self, obj):
+        request = self.context.get('request', None)
+        
+        if hasattr(obj, 'task_images') and obj.task_images:
+            print(obj.task_images)
+
+            urls = []
+
+            for item in obj.task_images:
+                if request:
+                    urls.append(request.build_absolute_uri(item.image.url))
+                else:
+                    urls.append(item.image.url)
+
+            return urls
+
+        return []

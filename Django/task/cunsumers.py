@@ -2,14 +2,20 @@ import json
 from channels.db import database_sync_to_async
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from django.core.files.base import ContentFile
+from django.db.models import Prefetch
 
-from api.serializers import UserSerializer
-from task.models import Task, TaskComment
+from api.serializers import TaskChatMessageSerializer, UserSerializer
+from task.models import Task, TaskComment, TaskImage
 from users.utils import create_notify_users
 from users.models import Group, Notification
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pending_files = {}
+
     async def connect(self):
         self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
         self.room_group_name = f"task_chat_{self.room_name}"
@@ -19,54 +25,74 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
-    @database_sync_to_async
-    def get_groups(self, user):
-        return list(Group.objects.filter(members__in=[user]))
-    
-    
-    @database_sync_to_async
-    def create_notification(self, task_id, message, user):
-        try:
-            task = Task.objects.get(id=task_id)
-            created = TaskComment.objects.create(
-                task=task,
-                user=user,
-                text=message
-            )
-
-            return {"type":'success', 'data': created}
-        
-        except Task.DoesNotExist:
-                return {"type":'error', "message": 'Not Task Chat model exists'}
-
 
     async def disconnect(self, close_code):
         # Leave room group
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     # Receive message from WebSocket
-    async def receive(self, text_data):
-        text_data_json = json.loads(text_data)
-        message = text_data_json["message"]
+    # async def receive(self, text_data):
+    #     text_data_json = json.loads(text_data)
+    #     message = text_data_json["message"]
 
-        user = UserSerializer(self.scope['user']).data
-        # print('ПОльзователь', user)
+    #     user = UserSerializer(self.scope['user']).data
+    #     # print('ПОльзователь', user)
 
-        create_result = await self.create_notification(task_id=text_data_json['taskID'], user=self.scope['user'], message=message)
+    #     create_result = await self.create_notification(task_id=text_data_json['taskID'], user=self.scope['user'], message=message)
 
-        match (create_result.get('type')):
-            case 'success':
-                # Send message to room group
-                await self.channel_layer.group_send(
-                    self.room_group_name, {"type": "chat.message", "message": message, 'user': user}
-                )
+    #     match (create_result.get('type')):
+    #         case 'success':
+    #             # Send message to room group
+    #             await self.channel_layer.group_send(
+    #                 self.room_group_name, {"type": "chat.message", "message": message, 'user': user}
+    #             )
             
-            case 'error':
-                await self.send(text_data=json.dumps({
-                    'type': 'error',
-                    'message': create_result.get('message', '')
-                }))
+    #         case 'error':
+    #             await self.send(text_data=json.dumps({
+    #                 'type': 'error',
+    #                 'message': create_result.get('message', '')
+    #             }))
+    
+    async def receive(self, text_data = None, bytes_data = None):
         
+        if text_data:
+            data = json.loads(text_data)
+            message_type = data.get('type')
+
+            if message_type == 'message_metadata':
+                message= await self.create_notification(data)
+                print(message)
+                self.pending_files[data['messageId']] = {
+                    'message': message['data'],
+                    'files': [],
+                    'expected_count': data['filesCount']
+                }
+
+            elif message_type == 'file_metadata':
+                message_id = data['messageId']
+                if message_id in self.pending_files:
+                    self.pending_files[message_id]['files'].append({
+                        'metadata': data,
+                        'data': None
+                    })
+
+            elif message_type == 'message_complete':
+                message_id = data['messageId']
+                await self.save_message_files(message_id)
+                user = UserSerializer(self.scope['user']).data
+                actual_message = await self.get_updated_message(self.pending_files[message_id]['message'].id)
+                print(actual_message)
+                print(actual_message.task_images)
+                await self.channel_layer.group_send(
+                    self.room_group_name, {"type": "chat.message", "message": TaskChatMessageSerializer(actual_message).data, 'user': user}
+                )
+
+        elif bytes_data:
+            for message_id, pending in self.pending_files.items():
+                for file_info in pending['files']:
+                    if file_info['data'] is None:
+                        file_info['data'] = bytes_data
+                        break
 
     # Receive message from room group
     async def chat_message(self, event):
@@ -79,7 +105,58 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'user': user
         }))
 
+    @database_sync_to_async
+    def get_updated_message(self, message_id):
+        return TaskComment.objects.select_related('user').prefetch_related(
+            Prefetch(
+                'message_image',
+                queryset=TaskImage.objects.all(),
+                to_attr='task_images'
+            )
+        ).get(id=message_id)
 
+    @database_sync_to_async
+    def get_groups(self, user):
+        return list(Group.objects.filter(members__in=[user]))
+    
+    
+    @database_sync_to_async
+    def create_notification(self, data):
+
+        try:
+            created = TaskComment.objects.create(
+                task_id=data['taskId'],
+                user=self.scope['user'],
+                text=data['message']
+            )
+
+            return {"type":'success', 'data': created}
+        
+        except Task.DoesNotExist:
+                return {"type":'error', "message": 'Not Task Chat model exists'}
+
+    @sync_to_async
+    def save_message_files(self, message_id):
+        if message_id not in self.pending_files:
+            return
+        
+        pending = self.pending_files[message_id]
+        message = pending['message']
+
+        print(self.pending_files)
+
+        for file_info in pending['files']:
+            metadata = file_info['metadata']
+            file_data = file_info['data']
+
+            if file_data:
+                file_obj = ContentFile(file_data, name=metadata['fileName'])
+                TaskImage.objects.create(
+                    message=message,
+                    image=file_obj
+                )
+        
+        
 
 class NotifiConsumer(AsyncWebsocketConsumer):
 
