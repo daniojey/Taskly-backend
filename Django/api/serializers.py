@@ -337,10 +337,18 @@ class TaskChatMessageSerializer(serializers.ModelSerializer):
 
             for item in obj.task_images:
                 if request:
-                    urls.append(request.build_absolute_uri(item.image.url))
+                    urls.append({
+                        "id": item.id,
+                        'url': request.build_absolute_uri(item.image.url),
+                        'filename': item.image.name.split('/')[1]
+                    })
                 else:
-                    urls.append(item.image.url)
-
+                    urls.append({
+                        "id": item.id,
+                        'url': item.image.url,
+                        'filename': item.image.name.split('/')[1]
+                    })
+            print(urls)
             return urls
 
         return []

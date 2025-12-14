@@ -1,7 +1,9 @@
 from datetime import date, datetime
 import json
+import mimetypes
+from statistics import mean
 from django.db.models import Q, Count, Prefetch, Exists, OuterRef
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -16,6 +18,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
 from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
+import mimetype
 
 from api.utils import GroupLogger
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
@@ -583,3 +586,26 @@ class GroupLogsViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             return Response({'results': []}, status=status.HTTP_200_OK)
         # return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+
+class DownloadChatImagesView(APIView):
+    def get(self, request, message_id, *args, **kwargs):
+        message = get_object_or_404(TaskImage, id=message_id)
+
+        if not message:
+            return Response({'errors': 'image not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+
+        mime_type, _ = mimetypes.guess_type(message.image.path)
+        if not mime_type:
+            mime_type = 'application/octet-stream'
+
+        response = FileResponse(
+            message.image.open('rb'),
+            as_attachment=True,
+            content_type=mime_type,
+            filename=message.image.name.split('/')[-1]
+        )
+
+        response['Content-Length'] = message.image.size
+        response.headers['content-disposition'] = message.image.name
+        return response

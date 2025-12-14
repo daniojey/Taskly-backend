@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView
 )
 from .views import (
+    DownloadChatImagesView,
     ChatMessagesListView,
     CustomTokenVerifyView,
     GroupLogsViewSet,
@@ -38,7 +39,8 @@ urlpatterns = [
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/verify/', CustomTokenVerifyView.as_view(), name='token_verify'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('chat-messages/<int:task_id>/', ChatMessagesListView.as_view(), name='chat-messages')
+    path('chat-messages/<int:task_id>/', ChatMessagesListView.as_view(), name='chat-messages'),
+    path('download/<int:message_id>/', DownloadChatImagesView.as_view(), name='download_image'),
 ]
 
 urlpatterns += router.urls

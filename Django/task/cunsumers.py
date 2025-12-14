@@ -30,28 +30,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Leave room group
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
-    # Receive message from WebSocket
-    # async def receive(self, text_data):
-    #     text_data_json = json.loads(text_data)
-    #     message = text_data_json["message"]
-
-    #     user = UserSerializer(self.scope['user']).data
-    #     # print('ПОльзователь', user)
-
-    #     create_result = await self.create_notification(task_id=text_data_json['taskID'], user=self.scope['user'], message=message)
-
-    #     match (create_result.get('type')):
-    #         case 'success':
-    #             # Send message to room group
-    #             await self.channel_layer.group_send(
-    #                 self.room_group_name, {"type": "chat.message", "message": message, 'user': user}
-    #             )
-            
-    #         case 'error':
-    #             await self.send(text_data=json.dumps({
-    #                 'type': 'error',
-    #                 'message': create_result.get('message', '')
-    #             }))
     
     async def receive(self, text_data = None, bytes_data = None):
         
