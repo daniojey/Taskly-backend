@@ -601,7 +601,7 @@ class DownloadChatImagesView(APIView):
 
         response = FileResponse(
             message.image.open('rb'),
-            as_attachment=True,
+            as_attachment=False,
             content_type=mime_type,
             filename=message.image.name.split('/')[-1]
         )

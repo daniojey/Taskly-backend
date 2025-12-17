@@ -193,8 +193,8 @@ REST_FRAMEWORK = {
     'VERSION_PARAM': 'version',
 
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/day',
-        'user': '100000000/day'
+        'anon': '10000/day',
+        'user': '10000000000/day'
     }
 }
 

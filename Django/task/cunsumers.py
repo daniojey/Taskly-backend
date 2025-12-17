@@ -35,6 +35,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         if text_data:
             data = json.loads(text_data)
+            print(data)
             message_type = data.get('type')
 
             if message_type == 'message_metadata':
@@ -101,11 +102,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def create_notification(self, data):
 
+        if 'answerToMessage' in data:
+            answer_message_data = {
+                'id': data['answerToMessage'].get('id'),
+                'text': data['answerToMessage'].get('text')
+            }
+            print('MEssage dataas',answer_message_data)
+        else:
+            answer_message_data = {}
+
         try:
             created = TaskComment.objects.create(
                 task_id=data['taskId'],
                 user=self.scope['user'],
-                text=data['message']
+                text=data['message'],
+                answer_to=answer_message_data
             )
 
             return {"type":'success', 'data': created}

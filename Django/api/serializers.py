@@ -316,7 +316,7 @@ class TaskChatMessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TaskComment
-        fields = ['text', 'user', 'created_at', 'message', 'images_urls']
+        fields = ['id','text', 'user', 'created_at', 'message', 'images_urls', 'answer_to']
 
 
     def get_user(self, obj):
