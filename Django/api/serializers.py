@@ -19,7 +19,6 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     group_name = serializers.SerializerMethodField()
     created_at = serializers.SerializerMethodField()
-    tasks = serializers.SerializerMethodField()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -28,9 +27,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if context and "no_group" in context:
             self.fields.pop('group')
-
-        if context and "include_tasks" not in context:
-            self.fields.pop('tasks')
             
 
     def get_group_name(self, obj):
@@ -39,18 +35,37 @@ class ProjectSerializer(serializers.ModelSerializer):
         else:
             return None
         
-    def get_tasks(self, obj):
-        count = self.context.get('count_tasks', None)
-
-        if count:
-            data = TaskSerializer(obj.tasks.all()[:count], many=True, context={'method': 'get'}).data
-        else:
-            data = TaskSerializer(obj.tasks.all(), many=True, context={'method': 'get'}).data
-        # print(obj.tasks.all())
-        return data 
-    
     def get_created_at(self, obj):
         return obj.created_at.strftime("%m/%d/%Y")
+
+    class Meta:
+        model = Project
+        fields = [
+            "id", 
+            'group',
+            "group_name", 
+            "title", 
+            "description", 
+            'created_at', 
+        ]
+
+    def validate(self, attrs):
+
+        if 'group' in attrs:
+            return super().validate(attrs)
+        else:
+            raise serializers.ValidationError({
+                    'group': 'You are not a member of this group.'
+                })
+        
+class ProjectWithTasksSerializer(ProjectSerializer):
+    tasks = serializers.SerializerMethodField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.task_count = self.context.get('task_count', False)
+
 
     class Meta:
         model = Project
@@ -64,15 +79,17 @@ class ProjectSerializer(serializers.ModelSerializer):
             'tasks'
         ]
 
-    def validate(self, attrs):
-
-        if 'group' in attrs:
-            return super().validate(attrs)
-        else:
-            raise serializers.ValidationError({
-                    'group': 'You are not a member of this group.'
-                })
+    def get_tasks(self, obj):
+        if hasattr(obj, 'project_tasks'):
+            
+            if self.task_count:
+                data = TaskSerializer(obj.project_tasks[:self.task_count], many=True).data
+            else:
+                data = TaskSerializer(obj.project_tasks, many=True).data
         
+            return data
+    
+        return None
 
 class TaskCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -201,13 +218,8 @@ class GroupSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        context = kwargs.get('context', None)
-
-        print(context)
-
-        # if context and context["include_projects"] == True:
-            # self.fields.pop('members')
-            # self.fields.pop('projects')
+        self.include_projects = self.context.get('include_projects', False)
+        self.count_tasks = self.context.get('count_tasks', None)
 
     class Meta:
         model = Group
@@ -228,24 +240,24 @@ class GroupSerializer(serializers.ModelSerializer):
     
     def get_projects(self, obj):
 
-        if not self.context.get("include_projects", None):
+        if not self.include_projects:
             return None
-        
         
         if hasattr(obj, 'group_projects'):
             data= ProjectSerializer(obj.group_projects, many=True, context={"no_group": True}).data
             return data
         
-        if hasattr(obj, 'projects'):
+        
+        if hasattr(obj, 'projects_in_group'):
             if self.context.get('include_tasks', None):
                 count = self.context.get('count_tasks', None)
 
-                query = obj.projects.all().annotate(count_tasks = Count('tasks')).order_by('-count_tasks')
+                query = obj.projects_in_group
 
                 if count:
-                    data = ProjectSerializer(query, many=True,  context={"no_group": True, 'include_tasks': True, 'count_tasks': count}).data
+                    data = ProjectWithTasksSerializer(query, many=True,  context={'count_tasks': count}).data
                 else:
-                    data = ProjectSerializer(query, many=True,  context={"no_group": True, 'include_tasks': True}).data
+                    data = ProjectWithTasksSerializer(query, many=True).data
             else:
                 data = ProjectSerializer(query, many=True,  context={"no_group": True}).data
             return data

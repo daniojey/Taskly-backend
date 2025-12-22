@@ -21,11 +21,12 @@ from rest_framework.throttling import UserRateThrottle
 import mimetype
 
 from api.utils import GroupLogger
+from common.mixins import CacheMixin
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
 from users.utils import create_notify_user, create_notify_users
 from task.models import Project, Task, TaskComment, TaskImage
 from users.models import Group, GroupLogs, Notification, User
-from .serializers import GroupCreateSerializer, GroupLogsSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
+from .serializers import GroupCreateSerializer, GroupLogsSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, ProjectWithTasksSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
 from api import serializers
 
 
@@ -92,12 +93,13 @@ class UserProfileAPiView(APIView):
             return Response({"message": "Error"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserGroupApiView(viewsets.ViewSet):
+class UserGroupApiView(CacheMixin, viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def list(self, request, *args, **kwargs):
         filter_projects = request.GET.get('f')
+        user = self.request.user
         
         match filter_projects:
             case 'A-z':
@@ -109,7 +111,6 @@ class UserGroupApiView(viewsets.ViewSet):
             case _:
                 order_by = 'created_at'
 
-
         queryset = request.user.user_groups.prefetch_related(
             Prefetch(
                 "projects",
@@ -120,18 +121,38 @@ class UserGroupApiView(viewsets.ViewSet):
             )
         ).order_by(order_by).all()
 
-        # print("QUERYSET",queryset.group_projects)
-        # for g in queryset:
-        #     print(g.group_projects)
+        groups = self.set_get_cache(queryset, f"groups_filter_{filter_projects}_user_{user.id}", 60)
 
-        serializer = GroupSerializer(queryset, many=True, context={"include_projects": True})
+        serializer = GroupSerializer(groups, many=True, context={"include_projects": True})
 
         return Response({"result": serializer.data}, status=status.HTTP_200_OK)
     
     def retrieve(self, request, pk=None, *args, **kwargs):
         if pk:
             user = request.user
-            group = Group.objects.get(pk=pk)
+            query = Group.objects.prefetch_related(
+                'members',
+                Prefetch(
+                    'projects',
+                    queryset=Project.objects.annotate(
+                        count_tasks=Count('tasks')
+                    ).prefetch_related(
+                        Prefetch(
+                            'tasks',
+                            queryset=Task.objects.all(),
+                            to_attr='project_tasks'
+                        )
+                    ).all().order_by('-count_tasks'),
+                    to_attr='projects_in_group'
+                )
+            ).get(pk=pk)
+
+            
+
+            # TODO ДОписать позже
+            group = self.set_get_cache(query, f'user_group_{user.id}', 70)
+
+            print(group.projects)
 
             if user.id in group.members.all().values_list("id", flat=True):
                 serializer = GroupSerializer(group, context={"include_projects": True , 'include_tasks': True, 'count_tasks': 2, 'request': request})
@@ -273,7 +294,7 @@ class UserGroupApiView(viewsets.ViewSet):
       
             
 
-class GroupProjectViewSet(viewsets.ViewSet):
+class GroupProjectViewSet(CacheMixin,viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -282,6 +303,7 @@ class GroupProjectViewSet(viewsets.ViewSet):
         return obj
 
     def list(self, request, *args, **kwargs):
+        user = self.request.user
         queryset = request.user.user_groups.prefetch_related(
             Prefetch(
                 "projects",
@@ -290,8 +312,9 @@ class GroupProjectViewSet(viewsets.ViewSet):
             )
         ).all()
 
+        groups = self.set_get_cache(queryset, f"groups_user_{user.id}", 70)
 
-        serializer = GroupSerializer(queryset, many=True, context={"include_projects": True})
+        serializer = GroupSerializer(groups, many=True, context={"include_projects": True})
 
         return Response({"result": serializer.data}, status=status.HTTP_200_OK)
 
@@ -309,7 +332,15 @@ class GroupProjectViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None, *args, **kwargs):
         if pk:
-            obj = Project.objects.get(pk=pk)
+            obj = Project.objects.select_related(
+                'group'
+            ).prefetch_related(
+                Prefetch(
+                    'tasks',
+                    queryset=Task.objects.all(),
+                    to_attr='project_tasks'
+                )
+            ).get(pk=pk)
 
             if not obj:
                 return Response({'message': '404'}, status=status.HTTP_404_NOT_FOUND)
@@ -317,7 +348,7 @@ class GroupProjectViewSet(viewsets.ViewSet):
             if obj.group and obj.group.id in request.user.user_groups.all():
                 return Response({'message': "403"}, status=status.HTTP_403_FORBIDDEN)
             
-            serializer = ProjectSerializer(obj)
+            serializer = ProjectWithTasksSerializer(obj)
 
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         
@@ -469,16 +500,20 @@ class TaskViewSet(viewsets.ViewSet):
             return Response({'message':'success delete'}, status=status.HTTP_204_NO_CONTENT)
 
 
-class NotificationViewSet(viewsets.ViewSet):
+class NotificationViewSet(CacheMixin, viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
-        notifivations = Notification.objects.select_related('user').filter(user=request.user).order_by('-created_at')
+        user = self.request.user
+
+        query = Notification.objects.select_related('user').filter(user=request.user).order_by('-created_at')
+
+        notifications = self.set_get_cache(query, f'notifications_user_{user}', 60)
 
         paginator = NotificationPaginator()
 
-        result = paginator.paginate_queryset(notifivations, request)
+        result = paginator.paginate_queryset(notifications, request)
 
         if result:
             serializer = NotificationSerializer(result, many=True)
@@ -524,8 +559,6 @@ class UserViewSet(viewsets.ViewSet):
         data = request.data
         group_id = data.get('group_id', None)
         username = data.get('username', None)
-
-        user = User.objects.get(username=username)
 
         if username:
             users = User.objects.filter(username__icontains=username).annotate(

@@ -111,6 +111,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         else:
             answer_message_data = {}
 
+        print(answer_message_data)
         try:
             created = TaskComment.objects.create(
                 task_id=data['taskId'],
