@@ -7,7 +7,7 @@ from django.db.models import Prefetch
 
 from api.serializers import TaskChatMessageSerializer, UserSerializer
 from task.models import Task, TaskComment, TaskImage
-from users.utils import create_notify_users
+from api.tasks import create_notify_users
 from users.models import Group, Notification
 
 

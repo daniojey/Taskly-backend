@@ -12,14 +12,14 @@ services:
     
     environment:
       DATABASE_URL: postgres://task_user:root@db:5432/Taskly
-      REDIS_HOST: redis
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
        condition: service_healthy
 
   db:
     restart: always
-    image: postgres
+    image: postgres:17
     environment:
       POSTGRES_DB: Taskly
       POSTGRES_USER: task_user
@@ -36,20 +36,31 @@ services:
       timeout: 5s
       retries: 5
 
+
   redis:
-    restart: always
     image: redis:7
-    # healthcheck:
-    #   test: ["CMD", "redis-cli", "ping"]
-    #   interval: 5s
+    restart: always
     command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  celery:
+    build: .
+    command: celery -A main worker --loglevel=info
+    networks:
+      - app-network
+    environment:
+        CELERY_BROKER_URL: redis://redis:6379/0
+        CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
-      db: 
-        condition: service_healthy
+      - redis
+      - web
+
 
 networks:
   app-network:

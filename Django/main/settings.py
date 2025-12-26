@@ -58,6 +58,7 @@ INSTALLED_APPS = [
 REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
 
 ASGI_APPLICATION = "main.asgi.application"
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -118,6 +119,8 @@ AUTH_USER_MODEL = 'users.User'
 #     }
 # }
 
+REDIS_URL = config('REDIS_URL', default='redis://127.0.0.0:6379/0')
+
 
 DATABASES = {
     'default': dj_database_url.config(
@@ -126,10 +129,11 @@ DATABASES = {
     )
 }
 
+
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379",
+        "LOCATION": REDIS_URL,
     }
 }
 
@@ -271,3 +275,13 @@ CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = False
 CSRF_USE_SESSIONS = False
+
+
+ENABLE_CELERY = config('ENABLE_CELERY', default=False)
+IS_ENABLE_CELERY = False
+
+if ENABLE_CELERY and REDIS_URL:
+    CELERY_BROKER_URL =  REDIS_URL
+    CELERY_RESULT_BACKEND = REDIS_URL
+    IS_ENABLE_CELERY = True
+    print('CELERY ADDED IN PROJECT')

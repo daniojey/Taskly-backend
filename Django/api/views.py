@@ -1,12 +1,8 @@
-from datetime import date, datetime
-import json
 import mimetypes
-from statistics import mean
 from django.db.models import Q, Count, Prefetch, Exists, OuterRef
 from django.http import FileResponse, JsonResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
@@ -15,19 +11,19 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.views import TokenVerifyView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework_simplejwt.tokens import UntypedToken, AccessToken
+from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
-import mimetype
 
+from api.tasks import create_notify_user, create_notify_users
 from api.utils import GroupLogger
 from common.mixins import CacheMixin
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
-from users.utils import create_notify_user, create_notify_users
 from task.models import Project, Task, TaskComment, TaskImage
 from users.models import Group, GroupLogs, Notification, User
 from .serializers import GroupCreateSerializer, GroupLogsSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, ProjectWithTasksSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
 from api import serializers
+from  main.settings import IS_ENABLE_CELERY
 
 
 
@@ -128,38 +124,40 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
         return Response({"result": serializer.data}, status=status.HTTP_200_OK)
     
     def retrieve(self, request, pk=None, *args, **kwargs):
-        if pk:
-            user = request.user
-            query = Group.objects.prefetch_related(
-                'members',
-                Prefetch(
-                    'projects',
-                    queryset=Project.objects.annotate(
-                        count_tasks=Count('tasks')
-                    ).prefetch_related(
-                        Prefetch(
-                            'tasks',
-                            queryset=Task.objects.all(),
-                            to_attr='project_tasks'
-                        )
-                    ).all().order_by('-count_tasks'),
-                    to_attr='projects_in_group'
-                )
-            ).get(pk=pk)
+        user = request.user
 
+        cache_data = self.get_cache(f"group_{pk}_user_{user.id}")
+            
+        if cache_data:
+            return Response({"result": cache_data}, status=status.HTTP_200_OK)
+        
+        query = Group.objects.prefetch_related(
+            'members',
+            Prefetch(
+                'projects',
+                queryset=Project.objects.annotate(
+                    count_tasks=Count('tasks')
+                ).prefetch_related(
+                    Prefetch(
+                        'tasks',
+                        queryset=Task.objects.all(),
+                        to_attr='project_tasks'
+                    )
+                ).all().order_by('-count_tasks'),
+                to_attr='projects_in_group'
+            )
+        ).get(pk=pk)
+            # TODO Решить проблему неправильного создания кэша завтра
             
 
-            # TODO ДОписать позже
-            group = self.set_get_cache(query, f'user_group_{user.id}', 70)
 
-            print(group.projects)
+        if query.members.filter(id=user.id).exists():
+            serializer = GroupSerializer(query, context={"include_projects": True , 'include_tasks': True, 'count_tasks': 2, 'request': request})
+            self.set_cache(serializer.data, f"group_{pk}_user_{user.id}", 50)
 
-            if user.id in group.members.all().values_list("id", flat=True):
-                serializer = GroupSerializer(group, context={"include_projects": True , 'include_tasks': True, 'count_tasks': 2, 'request': request})
-
-                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
-            else:
-                return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        else:
+            return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
     
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -191,13 +189,23 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
                 group = get_object_or_404(Group.objects.prefetch_related('members'), pk=pk)
                 
                 if not group.members.filter(id=user_id).exists():
-                    create_notify_user(
-                        user_id=user_id,
-                        type_message=Notification.INVITE_MESSAGE,
-                        notify_message=f"{request.user.username} wants to add you to a group",
-                        push_message="You have been invited to join a group",
-                        group_id=group.id
-                    )
+                    
+                    if IS_ENABLE_CELERY:
+                        result = create_notify_user.delay(
+                            user_id=user_id,
+                            type_message=Notification.INVITE_MESSAGE,
+                            notify_message=f"{request.user.username} wants to add you to a group",
+                            push_message="You have been invited to join a group",
+                            group_id=group.id
+                        )
+                    else :
+                        create_notify_user(
+                            user_id=user_id,
+                            type_message=Notification.INVITE_MESSAGE,
+                            notify_message=f"{request.user.username} wants to add you to a group",
+                            push_message="You have been invited to join a group",
+                            group_id=group.id
+                        )
 
                     user = User.objects.only('id', 'username').get(id=user_id)
 
@@ -213,7 +221,8 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
                 else:
                     return Response({'errors': 'User already from this group'}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as e:
-                return Response({'errors': [e]}, status=status.HTTP_400_BAD_REQUEST)
+                print(e)
+                return Response({'errors': f"{e}"}, status=status.HTTP_400_BAD_REQUEST)
 
         else:
             return Response({'errors': 'Not found group'}, status=status.HTTP_404_NOT_FOUND)
@@ -467,7 +476,10 @@ class TaskViewSet(viewsets.ViewSet):
             task.save()
 
 
-        create_notify_users(group=task.group, task_name=task.name, task_status=task.status)
+        if IS_ENABLE_CELERY:
+            create_notify_users.delay(group=task.group, task_name=task.name, task_status=task.status)
+        else:
+            create_notify_users(group=task.group, task_name=task.name, task_status=task.status)
         # chanel_layer = get_channel_layer()
         # async_to_sync(chanel_layer.group_send)(f"base_group_{user.id}", {'type': 'chat_message', 'message': 'lobzik', 'datas': 'data1', 'task_id': task.id})
 
