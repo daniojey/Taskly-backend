@@ -119,7 +119,7 @@ AUTH_USER_MODEL = 'users.User'
 #     }
 # }
 
-REDIS_URL = config('REDIS_URL', default='redis://127.0.0.0:6379/0')
+REDIS_URL = config('REDIS_URL', default=None)
 
 
 DATABASES = {
@@ -133,7 +133,7 @@ DATABASES = {
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": REDIS_URL,
+        "LOCATION": REDIS_URL if REDIS_URL else 'redis://localhost:6379',
     }
 }
 
@@ -284,4 +284,3 @@ if ENABLE_CELERY and REDIS_URL:
     CELERY_BROKER_URL =  REDIS_URL
     CELERY_RESULT_BACKEND = REDIS_URL
     IS_ENABLE_CELERY = True
-    print('CELERY ADDED IN PROJECT')

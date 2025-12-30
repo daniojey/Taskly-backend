@@ -572,28 +572,40 @@ class UserViewSet(viewsets.ViewSet):
         group_id = data.get('group_id', None)
         username = data.get('username', None)
 
-        if username:
-            users = User.objects.filter(username__icontains=username).annotate(
+        match (username, group_id):
+            case (str() as username, str()) if username:
+                users = User.objects.filter(username__icontains=username).annotate(
                 in_group=Exists(Group.objects.filter(
-                    id=group_id,
-                    members=OuterRef('pk')
-                )),
+                        id=group_id,
+                        members=OuterRef('pk')
+                    )),
 
-                is_invite_send=Exists(Notification.objects.filter(
-                    user=OuterRef('pk'),
-                    data__group_id=int(group_id),
-                    notify_type=Notification.INVITE_MESSAGE
-                ))
-            )
+                    is_invite_send=Exists(Notification.objects.filter(
+                        user=OuterRef('pk'),
+                        data__group_id=int(group_id),
+                        notify_type=Notification.INVITE_MESSAGE
+                    ))
+                )
 
-            serializer = UserSerializer(users, context={
-                'request': request, 
-                'check_in_group': True,
-            }, many=True)
+                serializer = UserSerializer(users, context={
+                    'request': request, 
+                    'check_in_group': True,
+                }, many=True)
 
-            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
-        else:
-            return Response({'results': []}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+
+            case (str() as username, None) if username:
+                print(username)
+                users = User.objects.filter(username__icontains=username)
+
+                serializer = UserSerializer(users, context ={
+                    'request': request,
+                }, many=True)
+
+                return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+            
+            case _:
+                return Response({ 'results': 'Error: not valid data in post'}, status=status.HTTP_400_BAD_REQUEST)
         
 
 class GroupLogsViewSet(viewsets.ReadOnlyModelViewSet):
