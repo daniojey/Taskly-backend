@@ -4,6 +4,7 @@ import attr
 from django.db.models import Count
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework.serializers import ValidationError
 from rest_framework.exceptions import NotFound
 
 from users.models import Group, GroupLogs, Notification, User
@@ -133,6 +134,41 @@ class TaskSerializer(serializers.ModelSerializer):
         if "method" in context and context['method'] == 'get':
             self.fields.pop('project')
 
+class CreateUserSerializer(serializers.ModelSerializer):
+    confirmPassword = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        print(attrs)
+        email = attrs.get('email', None)
+        password = attrs.get('password', None)
+        confirm_password = attrs.pop('confirmPassword', None)
+
+        if email and User.objects.filter(email=email).exists():
+            raise ValidationError('email exists')
+        
+        if not password or not confirm_password:
+            raise ValidationError('password and confim password required fields')
+        else:
+            if password != confirm_password:
+                raise ValidationError('passwords not match')
+
+        return attrs
+    
+    def create(self, validated_data):
+        user = User.objects.create_user(**validated_data)
+        return user
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'first_name',
+            'last_name',
+            'username',
+            'password',
+            'email',
+            'confirmPassword'
+        ]
 
 class UserSerializer(serializers.ModelSerializer):
     image_profile_url = serializers.SerializerMethodField()

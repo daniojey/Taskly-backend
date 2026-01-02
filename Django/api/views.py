@@ -21,7 +21,7 @@ from common.mixins import CacheMixin
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
 from task.models import Project, Task, TaskComment, TaskImage
 from users.models import Group, GroupLogs, Notification, User
-from .serializers import GroupCreateSerializer, GroupLogsSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, ProjectWithTasksSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
+from .serializers import CreateUserSerializer, GroupCreateSerializer, GroupLogsSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, ProjectWithTasksSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
 from api import serializers
 from  main.settings import IS_ENABLE_CELERY
 
@@ -565,6 +565,18 @@ class ChatMessagesListView(ListAPIView):
 
 
 class UserViewSet(viewsets.ViewSet):
+
+    def create(self, request, *args, **kwargs):
+        print(request.data)
+        serializer = CreateUserSerializer(data=request.data)
+
+        if serializer.is_valid():
+            user = serializer.save()
+            serializer_data = UserSerializer(user).data
+            return Response({'results': serializer_data}, status=status.HTTP_200_OK)
+        else:
+            return Response({'results': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
 
     @action(methods=['post'], detail=False)
     def search_users(self, request, *args, **kwargs):
