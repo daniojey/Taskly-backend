@@ -1,15 +1,14 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-    TokenVerifyView
-)
+
 from .views import (
+    CustomTokenPairView,
+    CustomTokenRefreshView,
     DownloadChatImagesView,
     ChatMessagesListView,
     CustomTokenVerifyView,
     GroupLogsViewSet,
+    LogoutTokenApiView,
     NotificationViewSet,
     TaskViewSet, 
     UserProfileAPiView, 
@@ -36,9 +35,10 @@ router.register('users', UserViewSet, basename='users')
 urlpatterns = [
     path('csrf/', csrf, name="get_csrf"),
     path("", view=UserProfileAPiView.as_view(), name="profile"),
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/', CustomTokenPairView.as_view(), name='token_obtain_pair'),
     path('token/verify/', CustomTokenVerifyView.as_view(), name='token_verify'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),
+    path('token/logout/', LogoutTokenApiView.as_view(), name="token_logout"),
     path('chat-messages/<int:task_id>/', ChatMessagesListView.as_view(), name='chat-messages'),
     path('download/<int:message_id>/', DownloadChatImagesView.as_view(), name='download_image'),
 ]

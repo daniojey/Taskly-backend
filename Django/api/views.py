@@ -9,12 +9,14 @@ from rest_framework.response import Response
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.views import TokenVerifyView
+from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
 
+
+from main import settings
 from api.tasks import create_notify_user, create_notify_users
 from api.utils import GroupLogger
 from common.mixins import CacheMixin
@@ -43,11 +45,78 @@ def csrf(request, *args, **kwargs):
     )
     return response
 
-# class GetCSRFToken(APIView):
-#     def get(self, request, *args, **kwargs):
-#         token = get_token(request)
-#         return Response({'csrfToken': token})
+
+class CustomTokenPairView(TokenObtainPairView):
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+
+        if response.status_code == 200:
+            new_response = Response({
+                'access': response.data['access'],
+                'user': {
+                    'id': request.user.id if hasattr(request, 'user') else None,
+                    'username': request.data.get('username', None)
+                }
+            }, status=status.HTTP_200_OK)
+
+            new_response.set_cookie(
+                'refresh',
+                response.data['refresh'],
+                max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
+                httponly=True,
+                samesite='Lax',
+                secure=False,
+            )
+
+            return new_response
+        
+        return response
+
+
+class CustomTokenRefreshView(TokenRefreshView):
+
+    def post(self, request, *args, **kwargs):
+        refresh_token = request.COOKIES.get('refresh')
+
+        if not refresh_token:
+            return Response({
+                'message': 'Token not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        request.data['refresh'] = refresh_token
+
+        response = super().post(request, *args, **kwargs)
+
+        if response.status_code == 200:
+            if 'refresh' in response.data:
+                new_refresh_token = response.data['refresh']
+
+                response.set_cookie(
+                    'refresh',
+                    new_refresh_token,
+                    max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
+                    secure=False,
+                    samesite='Lax',
+                    httponly=True,
+                )
+
+                del response.data['refresh']
+
+        return response
     
+
+    
+class LogoutTokenApiView(APIView):
+    def post(self, request, *args, **kwargs):
+        response = Response({'results': 'Logout success'}, status=status.HTTP_200_OK)
+        refresh_token = request.COOKIES.get('refresh')
+
+        if refresh_token:
+            response.delete_cookie('refresh')
+
+        return response
+
 class CustomTokenVerifyView(TokenVerifyView):
     def post(self, request, *args, **kwargs):
         token = request.data.get('token')
