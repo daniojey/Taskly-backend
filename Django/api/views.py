@@ -177,6 +177,7 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
                 order_by = 'created_at'
 
         queryset = request.user.user_groups.prefetch_related(
+            'members',
             Prefetch(
                 "projects",
                 queryset=Project.objects.all().annotate(
@@ -490,6 +491,7 @@ class TaskViewSet(viewsets.ViewSet):
 
         data = request.data
         data['project'] = project.id
+        data['created_by'] = request.user.id if hasattr(request, 'user') else None
         serializer = TaskCreateSerializer(data=data)
 
 

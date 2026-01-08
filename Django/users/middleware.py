@@ -21,17 +21,14 @@ class JWTAuthMiddleware :
     async def __call__(self, scope, receive, send):
         close_old_connections()
 
-        print(parse_qs(scope['query_string'].decode('utf8')))
         try:
             token = parse_qs(scope['query_string'].decode('utf8')).get('token', None)[ 0 ]
-            print(token)
             data = jwt_decode(token, settings.SECRET_KEY, algorithms=["HS256"])
 
-            print(data['user_id'])
             scope['user'] = await self.get_user(data['user_id'])
         except (TypeError, KeyError, InvalidSignatureError, ExpiredSignatureError, DecodeError):
-            print('NO auth')
             scope['user'] = AnonymousUser
+            
         return await self.app(scope, receive, send)
     
     @database_sync_to_async
