@@ -1,31 +1,36 @@
 import mimetypes
-from django.db.models import Q, Count, Prefetch, Exists, OuterRef
-from django.http import FileResponse, JsonResponse
+from rest_framework.views import APIView
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
-from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
-from rest_framework.response import Response
-from rest_framework import viewsets, status
+from django.http import FileResponse, JsonResponse
 from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
-from rest_framework_simplejwt.tokens import AccessToken
-from rest_framework.decorators import action
 from rest_framework.throttling import UserRateThrottle
+from rest_framework_simplejwt.tokens import AccessToken
+from django.db.models import Q, Count, Prefetch, Exists, OuterRef
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 
 
 from main import settings
-from api.tasks import create_notify_user, create_notify_users
 from api.utils import GroupLogger
 from common.mixins import CacheMixin
-from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
-from task.models import Project, Task, TaskComment, TaskImage
-from users.models import Group, GroupLogs, Notification, User
-from .serializers import CreateUserSerializer, GroupCreateSerializer, GroupLogsSerializer, GroupSerializer, NotificationSerializer, ProjectCreateSerializer, ProjectSerializer, ProjectWithTasksSerializer, TaskChatMessageSerializer, TaskCreateSerializer, TaskSerializer, UserSerializer
-from api import serializers
 from  main.settings import IS_ENABLE_CELERY
+from users.models import Group, GroupLogs, Notification, User
+from api.tasks import create_notify_user, create_notify_users
+from task.models import Project, Task, TaskComment, TaskImage
+from .serializers.group_logs_serializers import GroupLogsSerializer
+from .serializers.notification_serializers import NotificationSerializer
+from .serializers.task_chat_serializers import TaskChatMessageSerializer
+from .serializers.task_serializers import TaskCreateSerializer, TaskSerializer
+from .serializers.user_serializers import CreateUserSerializer, UserSerializer
+from .serializers.group_serializers import GroupCreateSerializer, GroupSerializer
+from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
+from .serializers.project_serializers import ProjectCreateSerializer, ProjectSerializer, ProjectWithTasksSerializer
 
 
 
@@ -34,13 +39,12 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 @ensure_csrf_cookie
 def csrf(request, *args, **kwargs):
     csrf_token = get_token(request)
-    # Возвращаем токен в JSON и устанавливаем куки
     response = JsonResponse({'csrfToken': 'ok'})
     response.set_cookie(
         'csrftoken',
         csrf_token,
         max_age=3600,
-        secure=False,  # True в production с HTTPS
+        secure=False,
         samesite='Lax',
     )
     return response
@@ -132,7 +136,7 @@ class CustomTokenVerifyView(TokenVerifyView):
             user_id = access_token.get('user_id')
 
             user = User.objects.get(id=user_id)
-            user_data = serializers.UserSerializer(user).data
+            user_data = UserSerializer(user).data
 
             return Response(
                 {"message": "Token is valid", "user": user_data},

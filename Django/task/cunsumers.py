@@ -5,10 +5,10 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.core.files.base import ContentFile
 from django.db.models import Prefetch
 
-from api.serializers import TaskChatMessageSerializer, UserSerializer
+from api.serializers.task_chat_serializers import TaskChatMessageSerializer
+from api.serializers.user_serializers import UserSerializer
 from task.models import Task, TaskComment, TaskImage
-from api.tasks import create_notify_users
-from users.models import Group, Notification
+from users.models import Group
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -107,7 +107,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'id': data['answerToMessage'].get('id'),
                 'text': data['answerToMessage'].get('text')
             }
-            print('MEssage dataas',answer_message_data)
         else:
             answer_message_data = {}
 
