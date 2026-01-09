@@ -51,34 +51,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                 })
         
 class ProjectWithTasksSerializer(ProjectSerializer):
-    tasks = serializers.SerializerMethodField()
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.task_count = self.context.get('task_count', False)
-
+    tasks = TaskSerializer(source='project_tasks', many=True)
 
     class Meta:
         model = Project
         fields = [
             "id", 
-            'group',
-            "group_name", 
             "title", 
             "description", 
             'created_at', 
             'tasks'
         ]
-
-    def get_tasks(self, obj):
-        if hasattr(obj, 'project_tasks'):
-            
-            if self.task_count:
-                data = TaskSerializer(obj.project_tasks[:self.task_count], many=True).data
-            else:
-                data = TaskSerializer(obj.project_tasks, many=True).data
-        
-            return data
-    
-        return None

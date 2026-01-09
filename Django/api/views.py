@@ -28,7 +28,7 @@ from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer
 from .serializers.task_serializers import TaskCreateSerializer, TaskSerializer
 from .serializers.user_serializers import CreateUserSerializer, UserSerializer
-from .serializers.group_serializers import GroupCreateSerializer, GroupSerializer
+from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer, GroupCountProjectsSerializer
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
 from .serializers.project_serializers import ProjectCreateSerializer, ProjectSerializer, ProjectWithTasksSerializer
 
@@ -180,22 +180,16 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
             case _:
                 order_by = 'created_at'
 
-        queryset = request.user.user_groups.prefetch_related(
-            'members',
-            Prefetch(
-                "projects",
-                queryset=Project.objects.all().annotate(
-                    task_count=Count('tasks')
-                ).select_related("group").order_by('-task_count'),
-                to_attr="group_projects"
-            )
+        queryset = request.user.user_groups.annotate(
+            count_members = Count('members'),
+            count_projects = Count('projects')
         ).order_by(order_by).all()
 
         groups = self.set_get_cache(queryset, f"groups_filter_{filter_projects}_user_{user.id}", 60)
 
-        serializer = GroupSerializer(groups, many=True, context={"include_projects": True})
+        serializer = GroupCountProjectsSerializer(groups, many=True, context={"include_projects": True})
 
-        return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
     
     def retrieve(self, request, pk=None, *args, **kwargs):
         user = request.user
@@ -203,10 +197,14 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
         cache_data = self.get_cache(f"group_{pk}_user_{user.id}")
             
         if cache_data:
-            return Response({"result": cache_data}, status=status.HTTP_200_OK)
+            return Response({"results": cache_data}, status=status.HTTP_200_OK)
         
         query = Group.objects.prefetch_related(
-            'members',
+            Prefetch(
+                'members',
+                queryset=User.objects.all(),
+                to_attr='prefetch_members'
+            ),
             Prefetch(
                 'projects',
                 queryset=Project.objects.annotate(
@@ -214,22 +212,19 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
                 ).prefetch_related(
                     Prefetch(
                         'tasks',
-                        queryset=Task.objects.all(),
+                        queryset=Task.objects.all()[:2],
                         to_attr='project_tasks'
                     )
                 ).all().order_by('-count_tasks'),
                 to_attr='projects_in_group'
             )
-        ).get(pk=pk)
-            # TODO Решить проблему неправильного создания кэша завтра
-            
-
+        ).only('id', 'name').get(pk=pk)
 
         if query.members.filter(id=user.id).exists():
-            serializer = GroupSerializer(query, context={"include_projects": True , 'include_tasks': True, 'count_tasks': 2, 'request': request})
+            serializer = GroupDetailSerializer(query, context={'request': request})
             self.set_cache(serializer.data, f"group_{pk}_user_{user.id}", 50)
 
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
         else:
             return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
     
@@ -247,65 +242,65 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
             return Response({"message": "not valid data", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk=None, *args, **kwargs):
-        if pk:
-            group = Group.objects.get(pk=pk)
-            group.delete()
+        group = get_object_or_404(Group.objects.select_related('owner').get(pk=pk))
 
-            return Response({"message": "success delete group"}, status=status.HTTP_204_NO_CONTENT)
+        if not group:
+            return Response({'results': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if group.owner.id == request.user.id:
+            group.delete()
+        else:
+            return Response({"results": "Only the creator can delete a group"}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response({"message": "success delete group"}, status=status.HTTP_204_NO_CONTENT)
     
     @action(detail=True, methods=['post'])
     def user_invite_group(self, request, pk, *args, **kwargs):
-        if pk:
-            try:
-                data = request.data
-                user_id = data.get('user_id', None)
+        data = request.data
+        user_id = data.get('user_id', None)
 
-                group = get_object_or_404(Group.objects.prefetch_related('members'), pk=pk)
+        group = get_object_or_404(Group.objects.prefetch_related('members'), pk=pk)
+
+        if not group:
+            return Response({'results': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
                 
-                if not group.members.filter(id=user_id).exists():
+        if not group.members.filter(id=user_id).exists():
                     
-                    if IS_ENABLE_CELERY:
-                        result = create_notify_user.delay(
-                            user_id=user_id,
-                            type_message=Notification.INVITE_MESSAGE,
-                            notify_message=f"{request.user.username} wants to add you to a group",
-                            push_message="You have been invited to join a group",
-                            group_id=group.id
-                        )
-                    else :
-                        create_notify_user(
-                            user_id=user_id,
-                            type_message=Notification.INVITE_MESSAGE,
-                            notify_message=f"{request.user.username} wants to add you to a group",
-                            push_message="You have been invited to join a group",
-                            group_id=group.id
-                        )
+            if IS_ENABLE_CELERY:
+                result = create_notify_user.delay(
+                    user_id=user_id,
+                    type_message=Notification.INVITE_MESSAGE,
+                    notify_message=f"{request.user.username} wants to add you to a group",
+                    push_message="You have been invited to join a group",
+                    group_id=group.id
+                )
+            else :
+                create_notify_user(
+                    user_id=user_id,
+                    type_message=Notification.INVITE_MESSAGE,
+                    notify_message=f"{request.user.username} wants to add you to a group",
+                    push_message="You have been invited to join a group",
+                    group_id=group.id
+                )
 
-                    user = User.objects.only('id', 'username').get(id=user_id)
+            user = User.objects.only('id', 'username').get(id=user_id)
 
-                    GroupLogger.send_invite_member(
-                        group=group,
-                        event_type=GroupLogs.INVITE_MEMBER,
-                        target_user=user,
-                        triggered_user=request.user
+            GroupLogger.send_invite_member(
+                group=group,
+                event_type=GroupLogs.INVITE_MEMBER,
+                target_user=user,
+                triggered_user=request.user
 
-                    )
+            )
 
-                    return Response({'results': 'success'}, status=status.HTTP_200_OK)
-                else:
-                    return Response({'errors': 'User already from this group'}, status=status.HTTP_400_BAD_REQUEST)
-            except Exception as e:
-                print(e)
-                return Response({'errors': f"{e}"}, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response({'results': 'success'}, status=status.HTTP_200_OK)
         else:
-            return Response({'errors': 'Not found group'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'results': 'User already from this group'}, status=status.HTTP_400_BAD_REQUEST)
         
     @action(detail=True, methods=['post'])
     def processing_group_invite(self, request, pk=None, *args, **kwargs):
         if not pk:
             return Response({'results': 'none'}, status=status.HTTP_400_BAD_REQUEST)
-        
         
         data = request.data
         notify_data  = data.get('notify', None)

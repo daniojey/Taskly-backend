@@ -49,6 +49,9 @@ class Task(models.Model):
         db_table = 'Task'
         verbose_name = 'Project task'
         verbose_name_plural = 'Project tasks'
+        indexes = [
+            models.Index(fields=['project', 'created_at']),
+        ]
     
 
 class TaskComment(models.Model):

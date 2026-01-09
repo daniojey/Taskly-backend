@@ -42,3 +42,18 @@ class TaskSerializer(serializers.ModelSerializer):
 
         if "method" in context and context['method'] == 'get':
             self.fields.pop('project')
+
+
+class ShortTaskSerializer(serializers.ModelSerializer):
+    #TODO Сделать укороченый сериализатор для оптимизации
+
+    class Meta:
+        model = Task
+        fields = [
+            "id", 
+            'name', 
+            'description', 
+            'deadline', 
+            'created_at', 
+            'status'
+        ]

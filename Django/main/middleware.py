@@ -14,4 +14,4 @@ class LogMiddleware:
         return response
     
     def process_exception(self, request, exception):
-        return HttpResponse(status=404)
+        return None

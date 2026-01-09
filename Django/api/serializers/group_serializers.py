@@ -70,3 +70,27 @@ class GroupSerializer(serializers.ModelSerializer):
             else:
                 data = ProjectSerializer(query, many=True,  context={"no_group": True}).data
             return data
+        
+
+class GroupCountProjectsSerializer(serializers.ModelSerializer):
+    count_projects = serializers.SerializerMethodField()
+    count_members = serializers.SerializerMethodField()
+
+    def get_count_projects(self, obj):
+        return obj.count_projects
+    
+    def get_count_members(self, obj):
+        return obj.count_members
+
+    class Meta:
+        model = Group
+        fields = ['id','name', 'count_projects', 'count_members']
+
+
+class GroupDetailSerializer(serializers.ModelSerializer):
+    projects = ProjectWithTasksSerializer(source="projects_in_group", many=True)
+    members = UserSerializer(source="prefetch_members", many=True)
+
+    class Meta:
+        model = Group
+        fields = ['id', 'name', 'projects', 'members']
