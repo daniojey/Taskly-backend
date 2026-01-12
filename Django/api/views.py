@@ -16,6 +16,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 
 
+from common.cache_managers.group_cache import GroupCacheManager
 from main import settings
 from api.utils import GroupLogger
 from common.mixins import CacheMixin
@@ -167,7 +168,7 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
     
     def list(self, request, *args, **kwargs):
-        filter_projects = request.GET.get('f')
+        filter_projects = request.GET.get('f', '')
         user = self.request.user
         
         match filter_projects:
@@ -185,6 +186,7 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
             count_projects = Count('projects')
         ).order_by(order_by).all()
 
+        print(filter_projects)
         groups = self.set_get_cache(queryset, f"groups_filter_{filter_projects}_user_{user.id}", 60)
 
         serializer = GroupCountProjectsSerializer(groups, many=True, context={"include_projects": True})
@@ -235,6 +237,11 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
 
         if serializer.is_valid():
             serializer.save()
+
+            GroupCacheManager.clean_group_list_cache(
+                filters=['A-z', 'Z-a', 'created', ''],
+                user_id=request.user.id
+            )
 
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         
