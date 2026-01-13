@@ -28,7 +28,7 @@ from .serializers.group_logs_serializers import GroupLogsSerializer
 from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer
 from .serializers.task_serializers import TaskCreateSerializer, TaskSerializer
-from .serializers.user_serializers import CreateUserSerializer, UserSerializer
+from .serializers.user_serializers import CreateUserSerializer, UserPerformerSerializer, UserSerializer
 from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer, GroupCountProjectsSerializer
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
 from .serializers.project_serializers import ProjectCreateSerializer, ProjectSerializer, ProjectWithTasksSerializer
@@ -755,3 +755,64 @@ class DownloadChatImagesView(APIView):
         response['Content-Length'] = message.image.size
         response.headers['content-disposition'] = message.image.name
         return response
+    
+
+class TaskPerformersViewSets(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes  = [IsAuthenticated]
+
+    def retrieve(self, request, pk=None, *args, **kwargs):
+        print(pk)
+        data = []
+
+        return Response({ 'results': data}, status=status.HTTP_200_OK)
+    
+    @action(methods=['get'], detail=True)
+    def group_performers(self, request, pk=None, *args, **kwargs):
+        group_id = request.GET.get('group', None)
+
+        if not group_id:
+            return Response({ 'results': "undefined group" }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            group_owner = Group.objects.filter(id=group_id).values_list('owner__id', flat=True).first()
+        except Group.DoesNotExist:
+            return Response({'results': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if request.user.id != group_owner:
+            return Response({ 'results': "Changes users can only group owner"}, status=status.HTTP_403_FORBIDDEN)
+
+        # members_ids = set([int(member_id) for member_id in group.members.all()])
+
+        users = User.objects.filter(
+            user_groups__id=group_id
+        ).annotate(
+            is_performer=Exists(
+                Task.objects.filter(
+                    id=pk,
+                    performers__id=OuterRef('id')
+                )
+            )
+        ).distinct()
+
+        serializer = UserPerformerSerializer(users, many=True)
+
+        return Response({ 'results': serializer.data}, status=status.HTTP_200_OK)
+    
+    @action(methods=['post'], detail=True)
+    def change_performers(self, request, pk=None, *args, **kwargs):
+        task = Task.objects.prefetch_related('performers').get(id=pk)
+        form_users_ids = set(request.data.get('usersIds', None))
+        performers_ids = set([user.id for user in task.performers.all()])
+
+        remove_data = performers_ids.difference(form_users_ids)
+        add_data = form_users_ids.difference(performers_ids)
+
+        if remove_data:
+            task.performers.remove(*remove_data)
+        
+        if add_data:
+            task.performers.add(*add_data)
+            
+        task.save()
+        return Response({'results': []}, status=status.HTTP_200_OK)

@@ -101,3 +101,13 @@ class UserSerializer(serializers.ModelSerializer):
             if not context.get('check_in_group', None):
                 self.fields.pop('in_group')
                 self.fields.pop('is_invite_send')
+
+
+class UserPerformerSerializer(serializers.ModelSerializer):
+    is_performer = serializers.BooleanField(read_only=True, default=False)
+
+    class Meta:
+        model=User
+        fields = ['id', 'username', 'image_profile', 'is_performer']
+
+    

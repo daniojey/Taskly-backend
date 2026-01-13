@@ -37,6 +37,7 @@ class Task(models.Model):
     deadline = models.DateTimeField(verbose_name="task_deadline")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    performers = models.ManyToManyField('users.User', related_name='assigned_tasks', verbose_name='performers')
 
     def __str__(self):
         return f"{self.project} - {self.name}"
@@ -52,6 +53,16 @@ class Task(models.Model):
         indexes = [
             models.Index(fields=['project', 'created_at']),
         ]
+
+
+class TaskPerformSession(models.Model):
+    performer = models.ForeignKey('users.User', related_name='task_sessions', on_delete=models.SET_NULL,null=True , blank=True)
+    task = models.ForeignKey('task.Task', related_name="performs_sessions", verbose_name='session task', on_delete=models.CASCADE)
+    duration = models.TimeField(verbose_name='session duration')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"performer:{self.performer.username} , task:{self.task.name}"
     
 
 class TaskComment(models.Model):

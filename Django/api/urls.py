@@ -10,6 +10,7 @@ from .views import (
     GroupLogsViewSet,
     LogoutTokenApiView,
     NotificationViewSet,
+    TaskPerformersViewSets,
     TaskViewSet, 
     UserProfileAPiView, 
     UserGroupApiView, 
@@ -29,7 +30,7 @@ router.register(r'projects/(?P<project_id>\d+)/tasks', TaskViewSet, basename='ta
 router.register('tasks', TaskViewSet, basename='tasks')
 router.register('notifications', NotificationViewSet, basename='notification')
 router.register('users', UserViewSet, basename='users')
-# router.register('chat-messages', ChatMessagesListView, basename='chat-messages')
+router.register('performers', TaskPerformersViewSets, basename='performers')
 
 
 urlpatterns = [
