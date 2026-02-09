@@ -1,4 +1,7 @@
+import datetime
 import mimetypes
+from django.utils import duration
+from django.utils.timezone import timedelta
 from rest_framework.views import APIView
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -16,6 +19,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 
 
+from api.serializers.session_performer_serializer import TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
 from common.cache_managers.group_cache import GroupCacheManager
 from main import settings
 from api.utils import GroupLogger
@@ -23,7 +27,7 @@ from common.mixins import CacheMixin
 from  main.settings import IS_ENABLE_CELERY
 from users.models import Group, GroupLogs, Notification, User
 from api.tasks import create_notify_user, create_notify_users
-from task.models import Project, Task, TaskComment, TaskImage
+from task.models import Project, Task, TaskComment, TaskImage, TaskPerformSession
 from .serializers.group_logs_serializers import GroupLogsSerializer
 from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer
@@ -762,7 +766,6 @@ class TaskPerformersViewSets(viewsets.ViewSet):
     permission_classes  = [IsAuthenticated]
 
     def retrieve(self, request, pk=None, *args, **kwargs):
-        print(pk)
         data = []
 
         return Response({ 'results': data}, status=status.HTTP_200_OK)
@@ -816,3 +819,134 @@ class TaskPerformersViewSets(viewsets.ViewSet):
             
         task.save()
         return Response({'results': []}, status=status.HTTP_200_OK)
+    
+    @action(methods=['post'], detail=False)
+    def start_sessing_performer(self, request, *args, **kwargs):
+        data = request.data
+
+        user_id = request.user.id
+        task_id = data.get('taskId', None)
+
+        try:
+            created = TaskPerformSession.objects.create(
+                performer_id=user_id,
+                task_id=task_id,
+                duration=timedelta(seconds=0)
+            )
+        except Exception as e:
+            print(e)
+            return Response({ 'results': 'Error create session'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({ 'results': created}, status=status.HTTP_200_OK)
+    
+
+class TaskSessionViewSets(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes  = [IsAuthenticated]
+
+
+    @action(methods=['get'], detail=True)
+    def get_task_performers_sessions(self, request, pk=None, *args, **kwargs):
+        data = request.GET
+        is_active = data.get('is_active', None)
+        user_filter = data.get('user', None)
+        show_unactive = data.get('unactive', None)
+        print(show_unactive, type(show_unactive))
+        print(is_active, type(is_active))
+
+        sessions_query = TaskPerformSession.objects.select_related('task').filter(task__id=pk).order_by('-created_at')
+        
+        if is_active is not None:
+            print('is_active filter')
+            sessions_query = sessions_query.filter(is_active=True)
+
+        if user_filter is not None:
+            print('userfilter filter')
+            sessions_query = sessions_query.filter(user__username__icontains=user_filter)
+
+        if show_unactive is not None:
+            print('unactive filter')
+            sessions_query = sessions_query.filter(is_active=False)
+
+        print(sessions_query)
+
+        # task = get_object_or_404(Task.objects.prefetch_related(
+        #     Prefetch(
+        #         'performs_sessions',
+        #         queryset=sessions_query,
+        #         to_attr='performers_sessions'
+        #     )
+        # ), id=pk)
+
+
+        # if not task:
+        #     return Response({'results': 'Not found task'}, status=status.HTTP_404_NOT_FOUND)
+        
+
+        serializer = TaskPerformSessionWithUsersSerializer(sessions_query, many=True)
+
+        return Response({ 'results': serializer.data}, status=status.HTTP_200_OK)
+
+    @action(methods=['post'], detail=False)
+    def start_session_performer(self, request, *args, **kwargs):
+        data = request.data
+
+        user_id = request.user.id
+        task_id = data.get('taskId', None)
+
+        print(task_id)
+
+        try:
+            created = TaskPerformSession.objects.create(
+                performer_id=user_id,
+                task_id=task_id,
+                duration=datetime.time(0, 0, 0),
+                is_active=True,
+            )
+        except Exception as e:
+            print(e)
+            return Response({ 'results': 'Error create session'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({ 'results': {'id': created.id}}, status=status.HTTP_200_OK)
+    
+    @action(methods=['patch'], detail=True)
+    def update_session_performer(self, request, pk=None, *args, **kwargs):
+        task_session = get_object_or_404(TaskPerformSession, id=pk)
+
+        session_time = request.data.get('time', None)
+
+        print(session_time)
+
+        if not session_time:
+            return Response({'results': 'Updated session error'}, status=status.HTTP_200_OK)
+
+        if not task_session:
+            return Response({'results': 'Not found task session'}, status=status.HTTP_404_NOT_FOUND)
+
+        total_seconds = session_time // 1000
+    
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+
+        task_session.duration = datetime.time(
+            hour=hours,
+            minute=minutes,
+            second=seconds
+        )
+        task_session.save(update_fields=['duration'])
+
+        return Response({ 'results': 'Session updated!'}, status=status.HTTP_200_OK)
+    
+    @action(methods=['post'], detail=True)
+    def end_session(self, request, pk=None, *args, **kwargs):
+        task_session = get_object_or_404(TaskPerformSession, id=pk)
+
+        if not task_session:
+            return Response({'results': ''}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+        task_session.is_active = False
+        task_session.save()
+        
+        return Response({'results': ''}, status=status.HTTP_200_OK)
