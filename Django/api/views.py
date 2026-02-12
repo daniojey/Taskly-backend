@@ -19,7 +19,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 
 
-from api.serializers.session_performer_serializer import TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
+from api.serializers.session_performer_serializer import SessionSerializerWithDate, TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
 from common.cache_managers.group_cache import GroupCacheManager
 from main import settings
 from api.utils import GroupLogger
@@ -851,10 +851,8 @@ class TaskSessionViewSets(viewsets.ViewSet):
         is_active = data.get('is_active', None)
         user_filter = data.get('user', None)
         show_unactive = data.get('unactive', None)
-        print(show_unactive, type(show_unactive))
-        print(is_active, type(is_active))
 
-        sessions_query = TaskPerformSession.objects.select_related('task').filter(task__id=pk).order_by('-created_at')
+        sessions_query = TaskPerformSession.objects.select_related('task', 'performer').filter(task__id=pk).order_by('-created_at')
         
         if is_active is not None:
             print('is_active filter')
@@ -868,7 +866,6 @@ class TaskSessionViewSets(viewsets.ViewSet):
             print('unactive filter')
             sessions_query = sessions_query.filter(is_active=False)
 
-        print(sessions_query)
 
         # task = get_object_or_404(Task.objects.prefetch_related(
         #     Prefetch(
@@ -900,7 +897,7 @@ class TaskSessionViewSets(viewsets.ViewSet):
             created = TaskPerformSession.objects.create(
                 performer_id=user_id,
                 task_id=task_id,
-                duration=datetime.time(0, 0, 0),
+                duration=timedelta(0, 0, 0, 0, 0, 0),
                 is_active=True,
             )
         except Exception as e:
@@ -929,11 +926,17 @@ class TaskSessionViewSets(viewsets.ViewSet):
         minutes = (total_seconds % 3600) // 60
         seconds = total_seconds % 60
 
-        task_session.duration = datetime.time(
-            hour=hours,
-            minute=minutes,
-            second=seconds
+        # task_session.duration = datetime.time(
+        #     hour=hours,
+        #     minute=minutes,
+        #     second=seconds
+        # )
+        task_session.duration = timedelta(
+            hours=hours,
+            minutes=minutes,
+            seconds=seconds
         )
+
         task_session.save(update_fields=['duration'])
 
         return Response({ 'results': 'Session updated!'}, status=status.HTTP_200_OK)
@@ -950,3 +953,26 @@ class TaskSessionViewSets(viewsets.ViewSet):
         task_session.save()
         
         return Response({'results': ''}, status=status.HTTP_200_OK)
+    
+
+class TaskStatisticsViewSets(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def retrieve(self, request, pk=None, *args, **kwargs):
+        task = Task.objects.filter(id=pk).exists()
+
+        if not task:
+            return Response({'results': 'Not found task'}, status=status.HTTP_404_NOT_FOUND)
+
+        task = Task.objects.prefetch_related(
+            Prefetch(
+                'performs_sessions',
+                queryset=TaskPerformSession.objects.all().order_by('-created_at'),
+                to_attr='performers_sessions'
+            )
+        ).get(id=pk)
+
+        serializer = SessionSerializerWithDate(task.performers_sessions, many=True)
+
+        return Response({'results': serializer.data}, status=status.HTTP_200_OK)

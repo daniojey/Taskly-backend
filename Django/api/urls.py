@@ -12,6 +12,7 @@ from .views import (
     NotificationViewSet,
     TaskPerformersViewSets,
     TaskSessionViewSets,
+    TaskStatisticsViewSets,
     TaskViewSet, 
     UserProfileAPiView, 
     UserGroupApiView, 
@@ -33,6 +34,7 @@ router.register('notifications', NotificationViewSet, basename='notification')
 router.register('users', UserViewSet, basename='users')
 router.register('performers', TaskPerformersViewSets, basename='performers')
 router.register('task-sessions', TaskSessionViewSets, basename='task-sessions')
+router.register('task-statistics', TaskStatisticsViewSets, basename='task-statistics')
 
 
 urlpatterns = [

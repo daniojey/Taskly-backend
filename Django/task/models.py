@@ -58,7 +58,7 @@ class Task(models.Model):
 class TaskPerformSession(models.Model):
     performer = models.ForeignKey('users.User', related_name='task_sessions', on_delete=models.SET_NULL,null=True , blank=True)
     task = models.ForeignKey('task.Task', related_name="performs_sessions", verbose_name='session task', on_delete=models.CASCADE)
-    duration = models.TimeField(verbose_name='session duration')
+    duration = models.DurationField(verbose_name='session duration')
     is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
