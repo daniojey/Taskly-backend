@@ -11,7 +11,6 @@ class TaskChatMessageSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
 
         context = kwargs.get('context', None)
-        print(context)
 
     class Meta:
         model = TaskComment
@@ -30,8 +29,6 @@ class TaskChatMessageSerializer(serializers.ModelSerializer):
         request = self.context.get('request', None)
         
         if hasattr(obj, 'task_images') and obj.task_images:
-            print(obj.task_images)
-
             urls = []
 
             for item in obj.task_images:
@@ -47,7 +44,6 @@ class TaskChatMessageSerializer(serializers.ModelSerializer):
                         'url': item.image.url,
                         'filename': item.image.name.split('/')[1]
                     })
-            print(urls)
             return urls
 
         return []

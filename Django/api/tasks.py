@@ -1,6 +1,6 @@
 from celery import shared_task
 
-from users.models import Notification
+from users.models import Group, Notification
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
@@ -26,8 +26,9 @@ def create_notify_user(user_id: int, type_message: str, notify_message: str, pus
     async_to_sync(channel.group_send)(f'chat_{user_id}', {'type': 'chat_message', 'message': push_message,})
 
 
-@shared_task
-def create_notify_users(group, task_name: str, task_status: str):
+@shared_task()
+def create_notify_users(group_id, task_name: str, task_status: str):
+    group = Group.objects.get(id=group_id)
     members = list(group.members.all())
 
     member_list = [
@@ -42,4 +43,4 @@ def create_notify_users(group, task_name: str, task_status: str):
     for item in members:
         async_to_sync(channel.group_send)(f'chat_{item.id}', {'type': 'chat_message', 'message': f'task: {task_name} status Updated', 'datas': 'data1'})
 
-    print(members)
+    # print(members)

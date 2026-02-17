@@ -55,6 +55,17 @@ class Task(models.Model):
         ]
 
 
+class ActiveTask(models.Model):
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, verbose_name='user')
+    task = models.ForeignKey('task.Task', on_delete=models.CASCADE, verbose_name='task')
+    date_add = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'Active_Task'
+        verbose_name = 'Active task'
+        verbose_name_plural = 'Active tasks'
+
+
 class TaskPerformSession(models.Model):
     performer = models.ForeignKey('users.User', related_name='task_sessions', on_delete=models.SET_NULL,null=True , blank=True)
     task = models.ForeignKey('task.Task', related_name="performs_sessions", verbose_name='session task', on_delete=models.CASCADE)

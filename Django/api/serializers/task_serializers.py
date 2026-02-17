@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from task.models import Task
+from api.serializers.user_serializers import UserSerializer
+from task.models import ActiveTask, Task
 
 class TaskCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -57,3 +58,17 @@ class ShortTaskSerializer(serializers.ModelSerializer):
             'created_at', 
             'status'
         ]
+
+class ActiveTaskSerializer(serializers.ModelSerializer):
+    task = TaskSerializer()
+    date_add = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ActiveTask
+        fields = [
+            'task',
+            'date_add'
+        ]
+
+    def get_date_add(self, obj):
+        return obj.date_add.strftime("%d %m %Y, %I:%M%p")

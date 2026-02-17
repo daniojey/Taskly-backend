@@ -27,11 +27,11 @@ from common.mixins import CacheMixin
 from  main.settings import IS_ENABLE_CELERY
 from users.models import Group, GroupLogs, Notification, User
 from api.tasks import create_notify_user, create_notify_users
-from task.models import Project, Task, TaskComment, TaskImage, TaskPerformSession
+from task.models import ActiveTask, Project, Task, TaskComment, TaskImage, TaskPerformSession
 from .serializers.group_logs_serializers import GroupLogsSerializer
 from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer
-from .serializers.task_serializers import TaskCreateSerializer, TaskSerializer
+from .serializers.task_serializers import ActiveTaskSerializer, TaskCreateSerializer, TaskSerializer
 from .serializers.user_serializers import CreateUserSerializer, UserPerformerSerializer, UserSerializer
 from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer, GroupCountProjectsSerializer
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
@@ -558,9 +558,9 @@ class TaskViewSet(viewsets.ViewSet):
 
 
         if IS_ENABLE_CELERY:
-            create_notify_users.delay(group=task.group, task_name=task.name, task_status=task.status)
+            create_notify_users.delay(group_id=task.group.id, task_name=task.name, task_status=task.status)
         else:
-            create_notify_users(group=task.group, task_name=task.name, task_status=task.status)
+            create_notify_users(group_id=task.group.id, task_name=task.name, task_status=task.status)
         # chanel_layer = get_channel_layer()
         # async_to_sync(chanel_layer.group_send)(f"base_group_{user.id}", {'type': 'chat_message', 'message': 'lobzik', 'datas': 'data1', 'task_id': task.id})
 
@@ -591,6 +591,31 @@ class TaskViewSet(viewsets.ViewSet):
                 return Response({'message': 'forbidden'}, status=status.HTTP_403_FORBIDDEN)
 
             return Response({'message':'success delete'}, status=status.HTTP_204_NO_CONTENT)
+        
+    @action(methods=['get'], detail=False)
+    def get_active_tasks(self, request, *args, **kwargs):
+        user = request.user
+        tasks = ActiveTask.objects.select_related('user', 'task', 'task__project').filter(user=user)
+        serializer = ActiveTaskSerializer(tasks, many=True)
+        return Response({ 'results': serializer.data}, status=status.HTTP_200_OK)
+    
+    @action(methods=['get'], detail=True)
+    def get_is_active_task(self, request, pk=None, *args, **kwargs):
+        is_active_task = ActiveTask.objects.filter(task__id=pk, user__id=request.user.id).exists()
+        return Response({ "results": is_active_task}, status=status.HTTP_200_OK)
+    
+    @action(methods=['post'], detail=True)
+    def change_active_task(self, request, pk=None, *args, **kwargs):
+        
+        if ActiveTask.objects.filter(user=request.user, task__id=pk).exists():
+            ActiveTask.objects.filter(user=request.user, task__id=pk).delete()
+        else:
+            task = Task.objects.get(id=pk)
+            active = ActiveTask.objects.create(user=request.user, task=task)
+            active.refresh_from_db()
+
+        result = ActiveTask.objects.filter(user=request.user, task__id=pk).exists()
+        return Response({'results': result}, status=status.HTTP_200_OK)
 
 
 class NotificationViewSet(CacheMixin, viewsets.ViewSet):
