@@ -90,7 +90,14 @@ class GroupCountProjectsSerializer(serializers.ModelSerializer):
 class GroupDetailSerializer(serializers.ModelSerializer):
     projects = ProjectWithTasksSerializer(source="projects_in_group", many=True)
     members = UserSerializer(source="prefetch_members", many=True)
+    is_owner = serializers.SerializerMethodField()
 
     class Meta:
         model = Group
-        fields = ['id', 'name', 'projects', 'members']
+        fields = ['id', 'name', 'projects', 'members', 'is_owner']
+
+    def get_is_owner(self, obj):
+        if hasattr(obj, 'is_owner'):
+            return obj.is_owner
+        else:
+            return False

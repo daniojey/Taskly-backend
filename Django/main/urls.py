@@ -25,6 +25,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     re_path(r'^api/(?P<version>(v1|v2))/', include("api.urls", namespace='api')),
+    path('api/v1/drf-auth/', include('rest_framework.urls')),
     path('tasks/', include('task.urls', namespace='task'))
 ]
 

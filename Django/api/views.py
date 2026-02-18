@@ -13,12 +13,14 @@ from django.http import FileResponse, JsonResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_simplejwt.tokens import AccessToken
-from django.db.models import Q, Count, Prefetch, Exists, OuterRef
+from django.db.models import Q, BooleanField, Case, Count, Prefetch, Exists, OuterRef, Value, When
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 
 
+from Django.api.permissions import OwnerOrReadOnly
 from api.serializers.session_performer_serializer import SessionSerializerWithDate, TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
 from common.cache_managers.group_cache import GroupCacheManager
 from main import settings
@@ -168,8 +170,8 @@ class UserProfileAPiView(APIView):
 
 
 class UserGroupApiView(CacheMixin, viewsets.ViewSet):
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [OwnerOrReadOnly, IsAuthenticated]
     
     def list(self, request, *args, **kwargs):
         filter_projects = request.GET.get('f', '')
@@ -204,7 +206,7 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
             
         if cache_data:
             return Response({"results": cache_data}, status=status.HTTP_200_OK)
-        
+          
         query = Group.objects.prefetch_related(
             Prefetch(
                 'members',
@@ -223,6 +225,12 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
                     )
                 ).all().order_by('-count_tasks'),
                 to_attr='projects_in_group'
+            )
+        ).annotate(
+            is_owner=Case(
+                When(owner=request.user, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField()
             )
         ).only('id', 'name').get(pk=pk)
 
@@ -253,7 +261,9 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
             return Response({"message": "not valid data", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk=None, *args, **kwargs):
-        group = get_object_or_404(Group.objects.select_related('owner').get(pk=pk))
+        group = get_object_or_404(Group.objects.select_related('owner'), id=pk)
+
+        self.check_object_permissions(request, group)
 
         if not group:
             return Response({'results': 'Group not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -365,7 +375,9 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
 
         if user_id:
             user = User.objects.only('id', 'username').get(id=user_id)
-            group = Group.objects.get(id=pk)
+            group = Group.objects.select_related('owner').get(id=pk)
+
+            self.check_object_permissions(request, group)
 
             group.members.remove(user_id)
             group.save()
