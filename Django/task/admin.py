@@ -17,4 +17,24 @@ class TaskImageModelAdmin(admin.ModelAdmin):
 
 @admin.register(TaskPerformSession)
 class TaskPerformSessionModelAdmin(admin.ModelAdmin):
-    pass
+    list_display = [
+        'id', 
+        'performer',
+        'task',
+        'duration',
+        'is_active',
+        'updated_at',
+        'created_at',
+    ]
+    list_display_links = [
+        'id',
+        'performer'
+    ]
+    list_select_related = ['performer', 'task']
+    list_per_page = 20
+
+    fieldsets = [
+        ('Basic', {'fields': ['performer', 'task', 'duration', 'is_active']}),
+        ('Dates', {'fields': ['created_at', 'updated_at']}),
+    ]
+    readonly_fields = ['updated_at', 'created_at']

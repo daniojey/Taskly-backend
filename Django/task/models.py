@@ -40,7 +40,7 @@ class Task(models.Model):
     performers = models.ManyToManyField('users.User', related_name='assigned_tasks', verbose_name='performers')
 
     def __str__(self):
-        return f"{self.project} - {self.name}"
+        return f"{self.name}"
     
     @property
     def group(self):
@@ -71,6 +71,7 @@ class TaskPerformSession(models.Model):
     task = models.ForeignKey('task.Task', related_name="performs_sessions", verbose_name='session task', on_delete=models.CASCADE)
     duration = models.DurationField(verbose_name='session duration')
     is_active = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

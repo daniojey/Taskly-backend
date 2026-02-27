@@ -1,8 +1,14 @@
-from celery import shared_task
+from celery import Celery, shared_task
+from celery.schedules import crontab
+from django.db.models import F, DurationField, ExpressionWrapper
+from django.utils import timezone
+from django.utils.timezone import timedelta 
 
 from users.models import Group, Notification
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from main.celery import app
+from task.models import TaskPerformSession
 
 
 @shared_task
@@ -43,4 +49,19 @@ def create_notify_users(group_id, task_name: str, task_status: str):
     for item in members:
         async_to_sync(channel.group_send)(f'chat_{item.id}', {'type': 'chat_message', 'message': f'task: {task_name} status Updated', 'datas': 'data1'})
 
-    # print(members)
+
+@app.on_after_finalize.connect
+def setup_periodic_tasks(sender: Celery, **kwargs):
+    sender.add_periodic_task(600.0, update_performers_sessions)
+
+
+@app.task
+def update_performers_sessions(*args, **kwargs):
+    sessions = TaskPerformSession.objects.annotate(
+        end_ref=ExpressionWrapper(
+            timezone.now() - F('updated_at') ,
+            output_field=DurationField()
+        )
+    ).filter(end_ref__gte=timedelta(minutes=10), is_active=True).update(is_active=False)
+
+    print('COMPLETE')

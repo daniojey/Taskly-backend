@@ -33,3 +33,6 @@ db.sqlite3
 # 5545345
 main/tests/__pycache__/
 media/
+
+# Celery beat logs
+celerybeat**

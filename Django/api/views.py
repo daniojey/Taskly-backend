@@ -20,7 +20,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 
 
-from Django.api.permissions import OwnerOrReadOnly
+from api.permissions import OwnerOrReadOnly
 from api.serializers.session_performer_serializer import SessionSerializerWithDate, TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
 from common.cache_managers.group_cache import GroupCacheManager
 from main import settings
@@ -974,7 +974,7 @@ class TaskSessionViewSets(viewsets.ViewSet):
             seconds=seconds
         )
 
-        task_session.save(update_fields=['duration'])
+        task_session.save(update_fields=['duration', 'updated_at'])
 
         return Response({ 'results': 'Session updated!'}, status=status.HTTP_200_OK)
     
