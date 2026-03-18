@@ -245,6 +245,11 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data
 
+        group_limit = Group.objects.filter(owner__id=request.user.id).count()
+
+        if group_limit >= 8:
+            return Response({'results': 'The limit for creating groups has been reached.'}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = GroupCreateSerializer(data=data)
 
         if serializer.is_valid():

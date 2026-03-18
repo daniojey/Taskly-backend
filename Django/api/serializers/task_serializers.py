@@ -31,10 +31,10 @@ class TaskSerializer(serializers.ModelSerializer):
         return obj.project.title
     
     def get_deadline(self, obj):
-        return obj.deadline.strftime("%m/%d/%Y | %H:%M")
+        return obj.deadline.strftime("%d/%m/%Y | %H:%M")
     
     def get_created_at(self, obj):
-        return obj.created_at.strftime("%m/%d/%Y")
+        return obj.created_at.strftime("%d/%m/%Y")
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

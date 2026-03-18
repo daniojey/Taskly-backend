@@ -82,12 +82,13 @@ class TaskComment(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, verbose_name='messages')
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, verbose_name='user_messages')
     answer_to = models.JSONField(default=list, verbose_name='reply_message')
-    text = models.TextField(max_length=1000, verbose_name='text_message')
+    text = models.TextField(max_length=1000, verbose_name='text_message', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user}:{self.text[:70]}"
+        return f"{self.user}:{self.text}"
+    
     class Meta:
         db_table = 'task_chat_message'
         verbose_name = 'Chat Message'
