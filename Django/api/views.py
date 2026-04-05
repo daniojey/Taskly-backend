@@ -94,8 +94,12 @@ class CustomTokenRefreshView(TokenRefreshView):
             return Response({
                 'message': 'Token not found'
             }, status=status.HTTP_404_NOT_FOUND)
-        
-        request.data['refresh'] = refresh_token
+
+        data = request.data.copy()
+        data['refresh'] = refresh_token
+
+        request._full_data = data       
+        # request.data['refresh'] = refresh_token
 
         response = super().post(request, *args, **kwargs)
 
@@ -135,7 +139,7 @@ class CustomTokenVerifyView(TokenVerifyView):
         if not token:
             return Response(
                 {"error": 'Token not found'},
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_404_NOT_FOUND
             )
         
         try:
@@ -192,7 +196,6 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
             count_projects = Count('projects')
         ).order_by(order_by).all()
 
-        print(filter_projects)
         groups = self.set_get_cache(queryset, f"groups_filter_{filter_projects}_user_{user.id}", 60)
 
         serializer = GroupCountProjectsSerializer(groups, many=True, context={"include_projects": True})
@@ -207,40 +210,43 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
         if cache_data:
             return Response({"results": cache_data}, status=status.HTTP_200_OK)
           
-        query = Group.objects.prefetch_related(
-            Prefetch(
-                'members',
-                queryset=User.objects.all(),
-                to_attr='prefetch_members'
-            ),
-            Prefetch(
-                'projects',
-                queryset=Project.objects.annotate(
-                    count_tasks=Count('tasks')
-                ).prefetch_related(
-                    Prefetch(
-                        'tasks',
-                        queryset=Task.objects.all()[:2],
-                        to_attr='project_tasks'
-                    )
-                ).all().order_by('-count_tasks'),
-                to_attr='projects_in_group'
-            )
-        ).annotate(
-            is_owner=Case(
-                When(owner=request.user, then=Value(True)),
-                default=Value(False),
-                output_field=BooleanField()
-            )
-        ).only('id', 'name').get(pk=pk)
+        try:
+            query = Group.objects.prefetch_related(
+                Prefetch(
+                    'members',
+                    queryset=User.objects.all(),
+                    to_attr='prefetch_members'
+                ),
+                Prefetch(
+                    'projects',
+                    queryset=Project.objects.annotate(
+                        count_tasks=Count('tasks')
+                    ).prefetch_related(
+                        Prefetch(
+                            'tasks',
+                            queryset=Task.objects.all()[:2],
+                            to_attr='project_tasks'
+                        )
+                    ).all().order_by('-count_tasks'),
+                    to_attr='projects_in_group'
+                )
+            ).annotate(
+                is_owner=Case(
+                    When(owner=request.user, then=Value(True)),
+                    default=Value(False),
+                    output_field=BooleanField()
+                )
+            ).only('id', 'name').get(pk=pk)
 
-        if query.members.filter(id=user.id).exists():
-            serializer = GroupDetailSerializer(query, context={'request': request})
-            self.set_cache(serializer.data, f"group_{pk}_user_{user.id}", 50)
+            if query.members.filter(id=user.id).exists():
+                serializer = GroupDetailSerializer(query, context={'request': request})
+                self.set_cache(serializer.data, f"group_{pk}_user_{user.id}", 50)
 
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
-        else:
-            return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+        except Group.DoesNotExist:
+            return Response({ 'results': 'Not found Group'}, status=status.HTTP_404_NOT_FOUND)
     
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -248,7 +254,7 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
         group_limit = Group.objects.filter(owner__id=request.user.id).count()
 
         if group_limit >= 8:
-            return Response({'results': 'The limit for creating groups has been reached.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'results': 'The limit for creating groups has been reached.'}, status=status.HTTP_403_FORBIDDEN)
 
         serializer = GroupCreateSerializer(data=data)
 
@@ -263,7 +269,8 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         
         else:
-            return Response({"message": "not valid data", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            print(serializer.errors)
+            return Response({"results": "not valid data", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk=None, *args, **kwargs):
         group = get_object_or_404(Group.objects.select_related('owner'), id=pk)
