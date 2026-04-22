@@ -62,3 +62,19 @@ class ProjectWithTasksSerializer(ProjectSerializer):
             'created_at', 
             'tasks'
         ]
+
+
+class ProjectWithoutTasksSerializer(serializers.ModelSerializer):
+    created_at = serializers.SerializerMethodField()
+
+    def get_created_at(self, obj):
+        return obj.created_at.strftime("%m/%d/%Y")
+
+    class Meta:
+        model = Project
+        fields = [
+            'id',
+            'title',
+            'description',
+            'created_at'
+        ]

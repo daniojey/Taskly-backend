@@ -77,10 +77,10 @@ class GroupCountProjectsSerializer(serializers.ModelSerializer):
     count_members = serializers.SerializerMethodField()
 
     def get_count_projects(self, obj):
-        return obj.count_projects
+        return len(obj.count_projects)
     
     def get_count_members(self, obj):
-        return obj.count_members
+        return len(obj.count_members)
 
     class Meta:
         model = Group

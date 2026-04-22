@@ -20,6 +20,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 
 
+from common.cache_managers.project_cache import ProjectCacheManager
 from api.permissions import OwnerOrReadOnly
 from api.serializers.session_performer_serializer import SessionSerializerWithDate, TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
 from common.cache_managers.group_cache import GroupCacheManager
@@ -37,7 +38,12 @@ from .serializers.task_serializers import ActiveTaskSerializer, TaskCreateSerial
 from .serializers.user_serializers import CreateUserSerializer, UserPerformerSerializer, UserSerializer
 from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer, GroupCountProjectsSerializer
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
-from .serializers.project_serializers import ProjectCreateSerializer, ProjectSerializer, ProjectWithTasksSerializer
+from .serializers.project_serializers import (
+    ProjectCreateSerializer, 
+    ProjectSerializer, 
+    ProjectWithTasksSerializer, 
+    ProjectWithoutTasksSerializer
+)
 
 
 
@@ -191,9 +197,23 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
             case _:
                 order_by = 'created_at'
 
-        queryset = request.user.user_groups.annotate(
-            count_members = Count('members'),
-            count_projects = Count('projects')
+        # queryset = request.user.user_groups.annotate(
+        #     count_members = Count('members'),
+        #     count_projects = Count('projects')
+        # ).order_by(order_by).all()
+
+        queryset = request.user.user_groups.prefetch_related(
+            Prefetch(
+                'projects',
+                queryset=Project.objects.all(),
+                to_attr='count_projects'
+            ),
+
+            Prefetch(
+                'members',
+                queryset=User.objects.all(),
+                to_attr='count_members'
+            )
         ).order_by(order_by).all()
 
         groups = self.set_get_cache(queryset, f"groups_filter_{filter_projects}_user_{user.id}", 60)
@@ -417,6 +437,12 @@ class GroupProjectViewSet(CacheMixin,viewsets.ViewSet):
 
     def list(self, request, *args, **kwargs):
         user = self.request.user
+        
+        cache_data = self.get_cache(f"projects_list_{user.id}")
+
+        if cache_data:
+            return Response({"result": cache_data}, status=status.HTTP_200_OK)
+
         queryset = request.user.user_groups.prefetch_related(
             Prefetch(
                 "projects",
@@ -425,9 +451,10 @@ class GroupProjectViewSet(CacheMixin,viewsets.ViewSet):
             )
         ).all()
 
-        groups = self.set_get_cache(queryset, f"groups_user_{user.id}", 70)
 
-        serializer = GroupSerializer(groups, many=True, context={"include_projects": True})
+        serializer = GroupSerializer(queryset, many=True, context={"include_projects": True})
+
+        self.set_cache(serializer.data, f'projects_list_{user.id}')
 
         return Response({"result": serializer.data}, status=status.HTTP_200_OK)
 
@@ -436,12 +463,42 @@ class GroupProjectViewSet(CacheMixin,viewsets.ViewSet):
         data = request.data
         serializer = ProjectCreateSerializer(data=data)
 
+        GroupCacheManager.clean_group_list_cache(
+            filters=['A-z', 'Z-a', 'created', ''],
+            user_id=request.user.id
+        )
+
+        ProjectCacheManager.clear_all_cache(user_id=request.user.id
+)
+
         if serializer.is_valid():
             serializer.save()
 
             return Response({'message': serializer.data}, status=status.HTTP_201_CREATED)
         else:
             return Response({'message': 'error', "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
+    @action(methods=['get'], detail=True)
+    def get_group_projects(self, request, pk=None, *args, **kwargs):
+        if pk is None:
+            return Response({'results': 'Without group Id'}, status=status.HTTP_404_NOT_FOUND)
+        
+        group =  Group.objects.select_related('owner').prefetch_related('members', 'projects').get(id=pk)
+
+        if not group:
+            return Response({'results': 'Not found group'}, status=status.HTTP_404_NOT_FOUND)
+        
+        user = request.user
+
+        if user not in group.members.all() or user != group.owner:
+            return Response({'results': 'access denied'}, status=status.HTTP_403_FORBIDDEN)
+        
+        projects = group.projects.all()
+
+        serializer = ProjectWithoutTasksSerializer(projects, many=True)
+
+        return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+
 
     def retrieve(self, request, pk=None, *args, **kwargs):
         if pk:

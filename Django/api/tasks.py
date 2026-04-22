@@ -20,6 +20,12 @@ def sum_strings(data_string: str):
 @shared_task()
 def create_notify_user(user_id: int, type_message: str, notify_message: str, push_message: str, group_id=None):
 
+    if type_message == Notification.INVITE_MESSAGE and group_id == None:
+        return
+    
+    if Notification.objects.filter(notify_type=type_message, user_id=user_id, data__group_id=group_id).exists():
+        return
+
     Notification.objects.create(
         notify_type=type_message,
         user_id=user_id, 
