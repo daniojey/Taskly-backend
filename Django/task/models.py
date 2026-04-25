@@ -108,3 +108,25 @@ class TaskImage(models.Model):
         verbose_name = 'Task image'
         verbose_name_plural = 'Task images'
     
+
+class Stratagem(models.Model):
+    OPEN_TASK = "OT"
+    OPEN_PROJECT = 'OP'
+    OPEN_GROUP = "OG"
+    OPEN_URL = 'OURL'
+
+    choices_action = {
+        OPEN_TASK: 'Open task',
+        OPEN_PROJECT: 'Open project',
+        OPEN_GROUP: 'Open group',
+        OPEN_URL: 'Open url'
+    }
+
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='stratagems', verbose_name='user')
+    name = models.CharField(max_length=100, verbose_name='stratagem name')
+    action = models.CharField(choices=choices_action)
+    url = models.URLField(verbose_name="url redirect")
+    created_date = models.DateTimeField(auto_now_add=True)
+    data = models.JSONField(verbose_name="stratagem data", null=True, blank=True)
+    active = models.BooleanField(default=True)
+    combination = models.JSONField(default=list)

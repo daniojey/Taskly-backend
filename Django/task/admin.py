@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from task.models import Task, TaskComment, TaskImage, TaskPerformSession
+from task.models import Stratagem, Task, TaskComment, TaskImage, TaskPerformSession
 
 # Register your models here.
 @admin.register(Task)
@@ -38,3 +38,7 @@ class TaskPerformSessionModelAdmin(admin.ModelAdmin):
         ('Dates', {'fields': ['created_at', 'updated_at']}),
     ]
     readonly_fields = ['updated_at', 'created_at']
+
+@admin.register(Stratagem)
+class StratagemModelAdmin(admin.ModelAdmin):
+    pass

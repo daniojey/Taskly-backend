@@ -20,6 +20,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 
 
+from api.serializers.stratagems_serializers import StratagemCreateSerializer, StratagemShortSerializer
 from common.cache_managers.project_cache import ProjectCacheManager
 from api.permissions import OwnerOrReadOnly
 from api.serializers.session_performer_serializer import SessionSerializerWithDate, TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
@@ -30,7 +31,7 @@ from common.mixins import CacheMixin
 from  main.settings import IS_ENABLE_CELERY
 from users.models import Group, GroupLogs, Notification, User
 from api.tasks import create_notify_user, create_notify_users
-from task.models import ActiveTask, Project, Task, TaskComment, TaskImage, TaskPerformSession
+from task.models import ActiveTask, Project, Stratagem, Task, TaskComment, TaskImage, TaskPerformSession
 from .serializers.group_logs_serializers import GroupLogsSerializer
 from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer
@@ -1082,3 +1083,36 @@ class TaskStatisticsViewSets(viewsets.ViewSet):
         serializer = SessionSerializerWithDate(task.performers_sessions, many=True)
 
         return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+
+
+class StratagemViewSets(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Stratagem.objects.select_related('user').all()
+    
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        stratagems = self.get_queryset().filter(user__id=user.id)
+
+        print(stratagems)
+
+        serializer = StratagemShortSerializer(stratagems, many=True)
+
+        return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+    
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        data['user'] = request.user.id
+
+        serializer = StratagemCreateSerializer(data=data)
+
+        if serializer.is_valid():
+            created = serializer.save()
+            serializer_obj = StratagemShortSerializer(created)
+            return Response({'results': serializer_obj.data}, status=status.HTTP_200_OK)
+        else:
+            return Response({'results': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    

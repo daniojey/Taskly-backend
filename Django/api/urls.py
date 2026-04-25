@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+
 from .views import (
     CustomTokenPairView,
     CustomTokenRefreshView,
@@ -10,6 +11,7 @@ from .views import (
     GroupLogsViewSet,
     LogoutTokenApiView,
     NotificationViewSet,
+    StratagemViewSets,
     TaskPerformersViewSets,
     TaskSessionViewSets,
     TaskStatisticsViewSets,
@@ -35,6 +37,7 @@ router.register('users', UserViewSet, basename='users')
 router.register('performers', TaskPerformersViewSets, basename='performers')
 router.register('task-sessions', TaskSessionViewSets, basename='task-sessions')
 router.register('task-statistics', TaskStatisticsViewSets, basename='task-statistics')
+router.register('stratagems', StratagemViewSets, basename='stratagems')
 
 
 urlpatterns = [
