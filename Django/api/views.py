@@ -592,6 +592,7 @@ class TaskViewSet(viewsets.ViewSet):
             
             return Response({'result': serializer.data}, status=status.HTTP_201_CREATED)
         else:
+            print(serializer.errors)
             return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         
     def partial_update(self, request, *args, **kwargs):
@@ -1096,7 +1097,7 @@ class StratagemViewSets(viewsets.ViewSet):
         user = request.user
         stratagems = self.get_queryset().filter(user__id=user.id)
 
-        print(stratagems)
+        # print(stratagems)
 
         serializer = StratagemShortSerializer(stratagems, many=True)
 
@@ -1115,4 +1116,35 @@ class StratagemViewSets(viewsets.ViewSet):
             return Response({'results': serializer_obj.data}, status=status.HTTP_200_OK)
         else:
             return Response({'results': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        print(pk)
+        try:
+            stratagem = Stratagem.objects.select_related('user').get(id=pk)
+        except Stratagem.DoesNotExist:
+            return Response({'results': 'Not found stratagem item'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if stratagem.user.id != request.user.id:
+            return Response({'results': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = StratagemShortSerializer(stratagem, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+        else:
+            return Response({'results': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk=None, *args, **kwargs):
+        try:
+            stratagem = Stratagem.objects.select_related('user').get(id=pk)
+        except Stratagem.DoesNotExist:
+            return Response({'results': 'Stratagem not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if stratagem.user.id != request.user.id:
+            return Response({'results': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        
+        stratagem.delete()
+
+        return Response({'results': 'Delete success'}, status=status.HTTP_204_NO_CONTENT)
+

@@ -36,11 +36,7 @@ class StratagemCreateSerializer(serializers.ModelSerializer):
         return new_data
     
     def create(self, validated_data):
-        print(validated_data['combination'])
         combination = validated_data['combination']
-
-        # if isinstance(combination, str):
-        #     raise serializers.ValidationError('Combination corupted')
 
         combination_list = [int(n) for n in combination.split(',')]
 
@@ -59,5 +55,5 @@ class StratagemShortSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Stratagem
-        fields = ['name', 'url', 'action', 'data', 'combination', 'active']
+        fields = ['id', 'name', 'url', 'action', 'data', 'combination', 'active']
 

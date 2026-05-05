@@ -37,7 +37,7 @@ class Task(models.Model):
     deadline = models.DateTimeField(verbose_name="task_deadline")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    performers = models.ManyToManyField('users.User', related_name='assigned_tasks', verbose_name='performers')
+    performers = models.ManyToManyField('users.User', related_name='assigned_tasks', verbose_name='performers', blank=True)
 
     def __str__(self):
         return f"{self.name}"

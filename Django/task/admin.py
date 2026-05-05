@@ -1,8 +1,12 @@
 from django.contrib import admin
 
-from task.models import Stratagem, Task, TaskComment, TaskImage, TaskPerformSession
+from task.models import ActiveTask, Stratagem, Task, TaskComment, TaskImage, TaskPerformSession
 
 # Register your models here.
+@admin.register(ActiveTask)
+class ActiveTaskModelAdmin(admin.ModelAdmin):
+    pass
+
 @admin.register(Task)
 class TaskModelAdmin(admin.ModelAdmin):
     pass
