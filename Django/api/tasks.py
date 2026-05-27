@@ -39,12 +39,12 @@ def create_notify_user(user_id: int, type_message: str, notify_message: str, pus
 
 
 @shared_task()
-def create_notify_users(group_id, task_name: str, task_status: str):
+def create_notify_users(notify_type, group_id, task_name: str, task_status: str):
     group = Group.objects.get(id=group_id)
     members = list(group.members.all())
 
     member_list = [
-        Notification(user=item, message=f"task: {task_name}: Status changed in {task_status}")
+        Notification(notify_type=notify_type ,user=item, message=f"task: {task_name}: Status changed in {task_status}")
         for item in members
     ]
 

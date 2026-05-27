@@ -2,7 +2,7 @@ import subprocess
 
 
 process = subprocess.Popen(
-    ['celery', '-A', 'main', 'worker', '--pool=solo'],
+    ['celery', '-A', 'main', 'worker', '--pool=solo', '--loglevel=info'],
 )
 
 process_beat = subprocess.Popen(

@@ -12,6 +12,7 @@ class TaskSerializer(serializers.ModelSerializer):
     project_name = serializers.SerializerMethodField()
     deadline = serializers.SerializerMethodField()
     created_at = serializers.SerializerMethodField()
+    is_performer = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
@@ -23,7 +24,8 @@ class TaskSerializer(serializers.ModelSerializer):
             'description', 
             'deadline', 
             'created_at', 
-            'status'
+            'status',
+            'is_performer'
         ]
 
     
@@ -35,6 +37,12 @@ class TaskSerializer(serializers.ModelSerializer):
     
     def get_created_at(self, obj):
         return obj.created_at.strftime("%d/%m/%Y")
+    
+    def get_is_performer(self, obj):
+        if hasattr(obj, 'is_performer'):
+            return obj.is_performer
+        else:
+            return False
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

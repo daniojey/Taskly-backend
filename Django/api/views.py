@@ -508,10 +508,18 @@ class GroupProjectViewSet(CacheMixin,viewsets.ViewSet):
             ).prefetch_related(
                 Prefetch(
                     'tasks',
-                    queryset=Task.objects.all(),
+                    queryset=Task.objects.all().annotate(
+                        is_performer=Exists(
+                            User.objects.filter(
+                                pk=request.user.pk,
+                                assigned_tasks=OuterRef("pk"),
+                            )
+                        )
+                    ),
                     to_attr='project_tasks'
                 )
             ).get(pk=pk)
+
 
             if not obj:
                 return Response({'message': '404'}, status=status.HTTP_404_NOT_FOUND)
@@ -521,6 +529,7 @@ class GroupProjectViewSet(CacheMixin,viewsets.ViewSet):
             
             serializer = ProjectWithTasksSerializer(obj)
 
+            print(serializer.data)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         
     def partial_update(self, request, *args, **kwargs):
@@ -627,7 +636,6 @@ class TaskViewSet(viewsets.ViewSet):
     
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None, *args, **kwargs):
-        user = request.user
 
         task = Task.objects.get(pk=pk)
 
@@ -641,9 +649,9 @@ class TaskViewSet(viewsets.ViewSet):
 
 
         if IS_ENABLE_CELERY:
-            create_notify_users.delay(group_id=task.group.id, task_name=task.name, task_status=task.status)
+            create_notify_users.delay(notify_type=Notification.TASK_UPDATE_MESSAGE,group_id=task.group.id, task_name=task.name, task_status=task.status)
         else:
-            create_notify_users(group_id=task.group.id, task_name=task.name, task_status=task.status)
+            create_notify_users(notify_type=Notification.TASK_UPDATE_MESSAGE, group_id=task.group.id, task_name=task.name, task_status=task.status)
         # chanel_layer = get_channel_layer()
         # async_to_sync(chanel_layer.group_send)(f"base_group_{user.id}", {'type': 'chat_message', 'message': 'lobzik', 'datas': 'data1', 'task_id': task.id})
 

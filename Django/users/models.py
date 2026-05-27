@@ -19,11 +19,11 @@ class User(AbstractUser):
 
 class Notification(models.Model):
     INVITE_MESSAGE = 'invite'
-    TASK_UPDATE_MESSAGE = 'task status update'
+    TASK_UPDATE_MESSAGE = 'task'
 
     TYPE_MESSAGES = [
         (INVITE_MESSAGE, 'invite'),
-        (TASK_UPDATE_MESSAGE, 'task status update'),
+        (TASK_UPDATE_MESSAGE, 'task'),
     ]
 
     notify_type = models.CharField(choices=TYPE_MESSAGES, verbose_name='message type')
