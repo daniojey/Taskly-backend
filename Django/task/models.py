@@ -54,6 +54,23 @@ class Task(models.Model):
             models.Index(fields=['project', 'created_at']),
         ]
 
+class SubTask(models.Model):
+    LOW_PRIORITY = "low"
+    NORMAL_PRIORITY = "Normal"
+    HIGH_PRIORITY = 'High'
+
+    PRIORITIES = [
+        (LOW_PRIORITY, 'Low priority'),
+        (NORMAL_PRIORITY, 'Normal priority'),
+        (HIGH_PRIORITY, 'High priority'),
+    ]
+
+    
+    title = models.TextField(max_length=100)
+    description = models.TextField(max_length=255)
+    priority = models.CharField(max_length=155, choices=PRIORITIES, verbose_name="subtask priority")
+    created_at = models.DateTimeField(auto_now_add=True)
+
 
 class ActiveTask(models.Model):
     user = models.ForeignKey('users.User', on_delete=models.CASCADE, verbose_name='user')

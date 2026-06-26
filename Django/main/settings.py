@@ -60,11 +60,13 @@ REDIS_HOST = config('REDIS_HOST', default='127.0.0.1')
 
 ASGI_APPLICATION = "main.asgi.application"
 
+REDIS_URL = config('REDIS_URL', default=None)
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(REDIS_HOST, 6379)],
+            "hosts": [REDIS_URL],
         },
     },
 }
@@ -122,7 +124,7 @@ AUTH_USER_MODEL = 'users.User'
 #     }
 # }
 
-REDIS_URL = config('REDIS_URL', default=None)
+
 
 
 DATABASES = {

@@ -846,12 +846,11 @@ class GroupLogsViewSet(viewsets.ReadOnlyModelViewSet):
         result = paginator.paginate_queryset(logs, request)
 
         if result:
-            serializer = GroupLogsSerializer(logs, many=True)
+            serializer = GroupLogsSerializer(result, many=True)
             return paginator.get_paginated_response(serializer.data)
 
         else:
             return Response({'results': []}, status=status.HTTP_200_OK)
-        # return Response({'results': serializer.data}, status=status.HTTP_200_OK)
 
 class DownloadChatImagesView(APIView):
     def get(self, request, message_id, *args, **kwargs):
@@ -1104,8 +1103,6 @@ class StratagemViewSets(viewsets.ViewSet):
     def list(self, request, *args, **kwargs):
         user = request.user
         stratagems = self.get_queryset().filter(user__id=user.id)
-
-        # print(stratagems)
 
         serializer = StratagemShortSerializer(stratagems, many=True)
 

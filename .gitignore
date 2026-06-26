@@ -36,3 +36,6 @@ media/
 
 # Celery beat logs
 celerybeat**
+
+# Backups
+backup.dump

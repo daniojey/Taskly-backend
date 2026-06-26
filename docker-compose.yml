@@ -9,9 +9,11 @@ services:
       - app-network
     ports:
       - "8000:8000"
-    
+    volumes:
+      - ./Django:/app 
+    command: python manage.py runserver 0.0.0.0:8000
     environment:
-      DATABASE_URL: postgres://task_user:root@db:5432/Taskly
+      DATABASE_URL: postgres://task_user:admin@db:5432/Taskly
       REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
@@ -23,13 +25,13 @@ services:
     environment:
       POSTGRES_DB: Taskly
       POSTGRES_USER: task_user
-      POSTGRES_PASSWORD: root
+      POSTGRES_PASSWORD: admin
     ports:
-      - "5433:5433"
+      - "5433:5432"
     networks:
       - app-network
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U task_user -d Taskly"]
       interval: 5s
@@ -51,6 +53,10 @@ services:
 
   celery:
     build: .
+    env_file:
+      - .env
+    volumes:
+      - ./Django:/app
     command: celery -A main worker --loglevel=info
     networks:
       - app-network
@@ -68,4 +74,4 @@ networks:
 
 
 volumes:
-  db_data:
+  pg_data:
