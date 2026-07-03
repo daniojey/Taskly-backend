@@ -13,7 +13,7 @@ services:
       - ./Django:/app 
     command: python manage.py runserver 0.0.0.0:8000
     environment:
-      DATABASE_URL: postgres://task_user:admin@db:5432/Taskly
+      DATABASE_URL: ${DATABESE_URL_DOCKER}
       REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
@@ -61,12 +61,31 @@ services:
     networks:
       - app-network
     environment:
+        DATABASE_URL: ${DATABESE_URL_DOCKER}
         CELERY_BROKER_URL: redis://redis:6379/0
         CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
       - redis
       - web
+      - db
 
+  celerybeat:
+    build: .
+    volumes:
+      - ./Django:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+      - celery
+    command: celery -A main beat -l DEBUG
+    environment:
+        DATABASE_URL: ${DATABESE_URL_DOCKER}
+        CELERY_BROKER_URL: redis://redis:6379/0
+        CELERY_RESULT_BACKEND: redis://redis:6379/0
+    networks:
+     - app-network
 
 networks:
   app-network:
