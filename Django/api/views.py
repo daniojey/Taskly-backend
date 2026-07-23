@@ -697,16 +697,21 @@ class TaskViewSet(viewsets.ViewSet):
     
     @action(methods=['post'], detail=True)
     def change_active_task(self, request, pk=None, *args, **kwargs):
-        
-        if ActiveTask.objects.filter(user=request.user, task__id=pk).exists():
+
+        active_task = ActiveTask.objects.filter(
+            user=request.user, task__id=pk
+        ).exists()
+
+        if active_task:
             ActiveTask.objects.filter(user=request.user, task__id=pk).delete()
         else:
             task = Task.objects.get(id=pk)
             active = ActiveTask.objects.create(user=request.user, task=task)
             active.refresh_from_db()
-
-        result = ActiveTask.objects.filter(user=request.user, task__id=pk).exists()
-        return Response({'results': result}, status=status.HTTP_200_OK)
+            return Response({ 'results': "added task in active tasks list", 'status': True}, status=status.HTTP_201_CREATED)
+        
+        
+        return Response({'results': "removed from active status", "status": False}, status=status.HTTP_200_OK)
 
 
 class NotificationViewSet(CacheMixin, viewsets.ViewSet):
@@ -1027,8 +1032,6 @@ class TaskSessionViewSets(viewsets.ViewSet):
 
         session_time = request.data.get('time', None)
 
-        print(session_time)
-
         if not session_time:
             return Response({'results': 'Updated session error'}, status=status.HTTP_200_OK)
 
@@ -1041,11 +1044,6 @@ class TaskSessionViewSets(viewsets.ViewSet):
         minutes = (total_seconds % 3600) // 60
         seconds = total_seconds % 60
 
-        # task_session.duration = datetime.time(
-        #     hour=hours,
-        #     minute=minutes,
-        #     second=seconds
-        # )
         task_session.duration = timedelta(
             hours=hours,
             minutes=minutes,
@@ -1060,10 +1058,22 @@ class TaskSessionViewSets(viewsets.ViewSet):
     def end_session(self, request, pk=None, *args, **kwargs):
         task_session = get_object_or_404(TaskPerformSession, id=pk)
 
-        if not task_session:
+        time = request.data.get('time', None)
+
+        if not task_session or not time:
             return Response({'results': ''}, status=status.HTTP_400_BAD_REQUEST)
         
+        total_seconds = time // 1000
+        
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
 
+        task_session.duration = timedelta(
+            hours=hours,
+            minutes=minutes,
+            seconds=seconds
+        )
         task_session.is_active = False
         task_session.save()
         

@@ -124,7 +124,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Task.DoesNotExist:
                 return {"type":'error', "message": 'Not Task Chat model exists'}
 
-    @sync_to_async
+    @database_sync_to_async
     def save_message_files(self, message_id):
         if message_id not in self.pending_files:
             return

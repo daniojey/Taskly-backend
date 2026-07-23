@@ -130,7 +130,7 @@ AUTH_USER_MODEL = 'users.User'
 DATABASES = {
     'default': dj_database_url.config(
         default="postgres://task_user:admin@localhost:5432/Taskly",
-        conn_max_age=600,
+        conn_max_age=30,
     )
 }
 
