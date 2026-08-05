@@ -3,6 +3,8 @@
 import os
 import sys
 from celery import Celery
+from celery.signals import worker_process_init, task_postrun
+from django.db import connections
 
 # Добавьте путь к Django проекту
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,3 +19,11 @@ app.autodiscover_tasks()
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
     print(f'Request: {self.request!r}')
+
+@worker_process_init.connect
+def close_db_connections(**kwargs):
+    connections.close_all()
+
+@task_postrun.connect
+def close_db_after_task(**kwargs):
+    connections.close_all()

@@ -89,8 +89,6 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'main.urls'
 
 
-
-
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -113,24 +111,12 @@ AUTH_USER_MODEL = 'users.User'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.postgresql",
-#         "NAME": "Taskly",
-#         "USER": "task_user",
-#         "PASSWORD": config("DATABASE_PASSWORD"),
-#         "HOST": "localhost",
-#         "PORT": "5432",
-#     }
-# }
-
-
-
 
 DATABASES = {
     'default': dj_database_url.config(
         default="postgres://task_user:admin@localhost:5432/Taskly",
-        conn_max_age=30,
+        conn_max_age=0, # I set value 0 because this need for celery and redis working fine
+        conn_health_checks=True
     )
 }
 

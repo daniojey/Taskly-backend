@@ -11,7 +11,8 @@ services:
       - "8000:8000"
     volumes:
       - ./Django:/app 
-    command: python manage.py runserver 0.0.0.0:8000
+    # command: gunicorn main.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 60 
+    command: python manage.py runserver 0.0.0.0:8000 
     environment:
       DATABASE_URL: ${DATABESE_URL_DOCKER}
       REDIS_URL: redis://redis:6379/0
@@ -20,7 +21,7 @@ services:
        condition: service_healthy
 
   db:
-    restart: always
+    restart: unless-stopped
     image: postgres:17
     environment:
       POSTGRES_DB: Taskly
@@ -57,7 +58,7 @@ services:
       - .env
     volumes:
       - ./Django:/app
-    command: celery -A main worker --loglevel=info
+    command: celery -A main worker --loglevel=info --concurrency=2
     networks:
       - app-network
     environment:
