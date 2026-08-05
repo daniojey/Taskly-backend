@@ -38,7 +38,7 @@ from .serializers.task_chat_serializers import TaskChatMessageSerializer
 from .serializers.task_serializers import ActiveTaskSerializer, TaskCreateSerializer, TaskSerializer
 from .serializers.user_serializers import CreateUserSerializer, UserPerformerSerializer, UserSerializer
 from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer, GroupCountProjectsSerializer
-from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator
+from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator, PerformerSessionsPaginator
 from .serializers.project_serializers import (
     ProjectCreateSerializer, 
     ProjectSerializer, 
@@ -916,7 +916,7 @@ class TaskPerformersViewSets(viewsets.ViewSet):
                     performers__id=OuterRef('id')
                 )
             )
-        ).distinct()
+        ).order_by('-is_performer').distinct()
 
         serializer = UserPerformerSerializer(users, many=True)
 
@@ -971,38 +971,31 @@ class TaskSessionViewSets(viewsets.ViewSet):
         is_active = data.get('is_active', None)
         user_filter = data.get('user', None)
         show_unactive = data.get('unactive', None)
+        page = data.get('page', None)
+
+        if page and page < 1 and type(page) != int: 
+            return Response({ "results": ["page not found"]}, status=status.HTTP_404_NOT_FOUND)
 
         sessions_query = TaskPerformSession.objects.select_related('task', 'performer').filter(task__id=pk).order_by('-created_at')
         
         if is_active is not None:
-            print('is_active filter')
             sessions_query = sessions_query.filter(is_active=True)
 
         if user_filter is not None:
-            print('userfilter filter')
             sessions_query = sessions_query.filter(user__username__icontains=user_filter)
 
         if show_unactive is not None:
-            print('unactive filter')
             sessions_query = sessions_query.filter(is_active=False)
 
+        paginator = PerformerSessionsPaginator()
+        result = paginator.paginate_queryset(sessions_query, request)
 
-        # task = get_object_or_404(Task.objects.prefetch_related(
-        #     Prefetch(
-        #         'performs_sessions',
-        #         queryset=sessions_query,
-        #         to_attr='performers_sessions'
-        #     )
-        # ), id=pk)
-
-
-        # if not task:
-        #     return Response({'results': 'Not found task'}, status=status.HTTP_404_NOT_FOUND)
-        
-
-        serializer = TaskPerformSessionWithUsersSerializer(sessions_query, many=True)
-
-        return Response({ 'results': serializer.data}, status=status.HTTP_200_OK)
+        if result:
+            serializer = TaskPerformSessionWithUsersSerializer(result, many=True)
+            return paginator.get_paginated_response(serializer.data)
+            # return Response({ 'results': serializer.data}, status=status.HTTP_200_OK)
+        else:
+            return Response({ 'results': []}, status=status.HTTP_404_NOT_FOUND)
 
     @action(methods=['post'], detail=False)
     def start_session_performer(self, request, *args, **kwargs):
