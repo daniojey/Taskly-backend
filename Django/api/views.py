@@ -973,7 +973,7 @@ class TaskSessionViewSets(viewsets.ViewSet):
         show_unactive = data.get('unactive', None)
         page = data.get('page', None)
 
-        if page and page < 1 and type(page) != int: 
+        if page and int(page) < 1 and type(page) != int: 
             return Response({ "results": ["page not found"]}, status=status.HTTP_404_NOT_FOUND)
 
         sessions_query = TaskPerformSession.objects.select_related('task', 'performer').filter(task__id=pk).order_by('-created_at')
@@ -995,7 +995,7 @@ class TaskSessionViewSets(viewsets.ViewSet):
             return paginator.get_paginated_response(serializer.data)
             # return Response({ 'results': serializer.data}, status=status.HTTP_200_OK)
         else:
-            return Response({ 'results': []}, status=status.HTTP_404_NOT_FOUND)
+            return Response({ 'results': []}, status=status.HTTP_200_OK)
 
     @action(methods=['post'], detail=False)
     def start_session_performer(self, request, *args, **kwargs):
