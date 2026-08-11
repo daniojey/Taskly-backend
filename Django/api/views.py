@@ -969,7 +969,7 @@ class TaskSessionViewSets(viewsets.ViewSet):
     def get_task_performers_sessions(self, request, pk=None, *args, **kwargs):
         data = request.GET
         is_active = data.get('is_active', None)
-        user_filter = data.get('user', None)
+        user_filter = data.get('user_filter', None)
         show_unactive = data.get('unactive', None)
         page = data.get('page', None)
 
@@ -977,12 +977,11 @@ class TaskSessionViewSets(viewsets.ViewSet):
             return Response({ "results": ["page not found"]}, status=status.HTTP_404_NOT_FOUND)
 
         sessions_query = TaskPerformSession.objects.select_related('task', 'performer').filter(task__id=pk).order_by('-created_at')
-        
         if is_active is not None:
             sessions_query = sessions_query.filter(is_active=True)
 
         if user_filter is not None:
-            sessions_query = sessions_query.filter(user__username__icontains=user_filter)
+            sessions_query = sessions_query.filter(performer__username__icontains=user_filter)
 
         if show_unactive is not None:
             sessions_query = sessions_query.filter(is_active=False)
