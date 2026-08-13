@@ -9,10 +9,7 @@ services:
       - app-network
     ports:
       - "8000:8000"
-    volumes:
-      - ./Django:/app 
-    # command: gunicorn main.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 60 
-    command: python manage.py runserver 0.0.0.0:8000 
+    command: gunicorn main.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 60 
     environment:
       DATABASE_URL: ${DATABESE_URL_DOCKER}
       REDIS_URL: redis://redis:6379/0
@@ -56,8 +53,6 @@ services:
     build: .
     env_file:
       - .env
-    volumes:
-      - ./Django:/app
     command: celery -A main worker --loglevel=info --concurrency=2
     networks:
       - app-network
@@ -72,8 +67,6 @@ services:
 
   celerybeat:
     build: .
-    volumes:
-      - ./Django:/app
     env_file:
       - .env
     depends_on:

@@ -39,3 +39,6 @@ celerybeat**
 
 # Backups
 backup.dump
+
+# docker
+docker-compose.override.yml
