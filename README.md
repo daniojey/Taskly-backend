@@ -91,3 +91,7 @@ DATABESE_URL_DOCKER: postgres://task_user:admin@db:5432/Taskly # example databas
 # After all build and run docker-compose
 docker compose up --build -d
 ```
+
+---
+ 
+Built by [Dmytro](https://github.com/daniojey)
