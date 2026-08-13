@@ -92,6 +92,10 @@ DATABESE_URL_DOCKER: postgres://task_user:admin@db:5432/Taskly # example databas
 docker compose up --build -d
 ```
 
+After install backend you can install Frontend part
+
+Taskly [Frontend](https://github.com/daniojey/Taskly-Frontend#getting-started)
+
 ---
  
 Built by [Dmytro](https://github.com/daniojey)
