@@ -1,5 +1,5 @@
 import mimetypes
-from main.settings import CSRF_COOKIE_SAMESITE, CSRF_COOKIE_SECURE, SESSION_COOKIE_SAMESITE
+from django.conf import settings
 from django.utils.timezone import timedelta
 from rest_framework.views import APIView
 from rest_framework import viewsets, status
@@ -57,8 +57,8 @@ def csrf(request, *args, **kwargs):
         'csrftoken',
         csrf_token,
         max_age=3600,
-        secure=CSRF_COOKIE_SECURE,
-        samesite=CSRF_COOKIE_SAMESITE,
+        secure=settings.CSRF_COOKIE_SECURE,
+        samesite=settings.CSRF_COOKIE_SAMESITE,
     )
     return response
 
@@ -82,8 +82,8 @@ class CustomTokenPairView(TokenObtainPairView):
                 response.data['refresh'],
                 max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
                 httponly=True,
-                samesite=CSRF_COOKIE_SAMESITE,
-                secure=CSRF_COOKIE_SECURE,
+                samesite=settings.CSRF_COOKIE_SAMESITE,
+                secure=settings.CSRF_COOKIE_SECURE,
             )
 
             return new_response
@@ -117,8 +117,8 @@ class CustomTokenRefreshView(TokenRefreshView):
                     'refresh',
                     new_refresh_token,
                     max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
-                    secure=CSRF_COOKIE_SECURE,
-                    samesite=CSRF_COOKIE_SAMESITE,
+                    secure=settings.CSRF_COOKIE_SECURE,
+                    samesite=settings.CSRF_COOKIE_SAMESITE,
                     httponly=True,
                 )
 
