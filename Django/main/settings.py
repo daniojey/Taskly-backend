@@ -252,7 +252,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # URL твоего React-приложения
     'http://localhost:5173', 
     'http://localhost:4173',
-    # 'https://tasklyfront.netlify.app/'
+    'https://tasklyfront.netlify.app/',
 ]
 
 CORS_ALLOW_CREDENTIALS = True  # Разрешить передачу кук
