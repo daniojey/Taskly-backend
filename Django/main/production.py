@@ -9,7 +9,8 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 ALLOWED_HOSTS = [
-    "taskly-backend-production-e362.up.railway.app"
+    "taskly-backend-production-e362.up.railway.app",
+    'tasklyfront.netlify.app',
 ]
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
