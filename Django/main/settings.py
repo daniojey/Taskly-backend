@@ -174,6 +174,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
 STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
@@ -249,7 +252,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # URL твоего React-приложения
     'http://localhost:5173', 
     'http://localhost:4173',
-    'https://tasklyfront.netlify.app/'
+    # 'https://tasklyfront.netlify.app/'
 ]
 
 CORS_ALLOW_CREDENTIALS = True  # Разрешить передачу кук
