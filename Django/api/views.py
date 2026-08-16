@@ -33,7 +33,7 @@ from api.tasks import create_notify_user, create_notify_users
 from task.models import ActiveTask, Project, Stratagem, Task, TaskComment, TaskImage, TaskPerformSession
 from .serializers.group_logs_serializers import GroupLogsSerializer
 from .serializers.notification_serializers import NotificationSerializer
-from .serializers.task_chat_serializers import TaskChatMessageSerializer
+from .serializers.task_chat_serializers import TaskChatMessageSerializer, TaskimageSerializer
 from .serializers.task_serializers import ActiveTaskSerializer, TaskCreateSerializer, TaskSerializer
 from .serializers.user_serializers import CreateUserSerializer, UserPerformerSerializer, UserSerializer
 from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer, GroupCountProjectsSerializer
@@ -763,6 +763,25 @@ class ChatMessagesListView(ListAPIView):
         
         # return TaskChatMessage.objects.select_related('user').filter(chat=chat)
 
+class ChatMessageImagesView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes  = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        files = request.FILES.getlist('images')
+
+        if not files:
+            return Response({"results": "Not found files"}, status=status.HTTP_404_NOT_FOUND)
+
+        images = [
+            TaskImage(title="", image=file)
+            for file in files
+        ]
+
+        created_images = TaskImage.objects.bulk_create(images)
+
+        serializer = TaskimageSerializer(created_images, many=True, context={"request": request})
+        return Response({'results': serializer.data})
 
 
 class UserViewSet(viewsets.ViewSet):

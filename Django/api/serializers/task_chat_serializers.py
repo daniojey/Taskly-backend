@@ -1,5 +1,7 @@
+from re import A
+
 from rest_framework import serializers
-from task.models import TaskComment
+from task.models import TaskComment, TaskImage
 from api.serializers.user_serializers import UserSerializer
 
 class TaskChatMessageSerializer(serializers.ModelSerializer):
@@ -47,3 +49,19 @@ class TaskChatMessageSerializer(serializers.ModelSerializer):
             return urls
 
         return []
+
+
+class TaskimageSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskImage
+        fields = ["id", "title", "image", "image_url"]
+
+    def get_image_url(self, obj):
+        request = self.context.get("request", None)
+
+        if request:
+            return request.build_absolute_uri(obj.image.url)
+        else:
+            return obj.image.url

@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 
 from .views import (
+    ChatMessageImagesView,
     CustomTokenPairView,
     CustomTokenRefreshView,
     DownloadChatImagesView,
@@ -49,6 +50,7 @@ urlpatterns = [
     path('token/logout/', LogoutTokenApiView.as_view(), name="token_logout"),
     path('chat-messages/<int:task_id>/', ChatMessagesListView.as_view(), name='chat-messages'),
     path('download/<int:message_id>/', DownloadChatImagesView.as_view(), name='download_image'),
+    path('upload-chat-images/', ChatMessageImagesView.as_view(), name='upload_chat_images')
 ]
 
 urlpatterns += router.urls
