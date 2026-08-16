@@ -8,7 +8,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.railway.app",
 ]
 
-CORS_ALLOWED_ORIGINS += ['https://tasklyfront.netlify.app/']
+CORS_ALLOWED_ORIGINS += ['https://tasklyfront.netlify.app']
 
 ALLOWED_HOSTS = [
     "taskly-backend-production-e362.up.railway.app",
