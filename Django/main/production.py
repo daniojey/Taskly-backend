@@ -6,8 +6,11 @@ MAIN_ORIGIN = config("MAIN_ORIGIN", None)
 if MAIN_ORIGIN:
     ALLOWED_HOSTS += [MAIN_ORIGIN]
 
-DEBUG = False
+DEBUG = True
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.railway.app",
+]
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = True  
