@@ -151,12 +151,16 @@ class NotifiConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         user = self.scope['user']
-        print(user)
+        print(f"WS Connect Attempt. User: {user}, Authenticated: {getattr(user, 'is_authenticated', False)}")
 
         if user.is_authenticated:
             print('ПОЛЬЗОВАТЕЛЬ АУТЕНТИФИЦИРОВАН')
             await self.channel_layer.group_add(f'chat_{user.id}', self.channel_name)
             await self.accept()
+        else:
+            print('ОТКЛОНЕНО: Пользователь не авторизован')
+            # Явно закрываем соединение с кодом ошибки
+            await self.close(code=4003)
 
         
     async def chat_message(self, event):
