@@ -22,8 +22,6 @@ from task.routing import websocket_urlpatterns
 
 application = ProtocolTypeRouter({
     'http': django_asgi_app,
-    'websocket': AllowedHostsOriginValidator(
-        JWTAuthMIddlewareStack(URLRouter(websocket_urlpatterns))
-    ),
+    'websocket': JWTAuthMIddlewareStack(URLRouter(websocket_urlpatterns)),
 })
 
