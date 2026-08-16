@@ -1,15 +1,15 @@
 from .settings import *
 from decouple import config
 
-MAIN_ORIGIN = config("MAIN_ORIGIN", None)
 
-if MAIN_ORIGIN:
-    ALLOWED_HOSTS += [MAIN_ORIGIN]
-
-DEBUG = True
+DEBUG = False
 
 CSRF_TRUSTED_ORIGINS = [
     "https://*.railway.app",
+]
+
+ALLOWED_HOSTS = [
+    "taskly-backend-production-e362.up.railway.app"
 ]
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
