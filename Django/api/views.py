@@ -1,4 +1,6 @@
 import mimetypes
+from asgiref.sync import async_to_sync
+from decouple import config
 from django.conf import settings
 from django.utils.timezone import timedelta
 from rest_framework.views import APIView
@@ -30,7 +32,7 @@ from common.mixins import CacheMixin
 from  main.settings import IS_ENABLE_CELERY
 from users.models import Group, GroupLogs, Notification, User
 from api.tasks import create_notify_user, create_notify_users
-from task.models import ActiveTask, Project, Stratagem, Task, TaskComment, TaskImage, TaskPerformSession
+from task.models import ActiveTask, Project, Stratagem, SubTask, Task, TaskComment, TaskImage, TaskPerformSession
 from .serializers.group_logs_serializers import GroupLogsSerializer
 from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer, TaskimageSerializer
@@ -48,6 +50,8 @@ from .serializers.project_serializers import (
 
 
 from django.views.decorators.csrf import ensure_csrf_cookie
+from google import genai
+from google.genai import types
 
 @ensure_csrf_cookie
 def csrf(request, *args, **kwargs):
@@ -1173,3 +1177,123 @@ class StratagemViewSets(viewsets.ViewSet):
 
         return Response({'results': 'Delete success'}, status=status.HTTP_204_NO_CONTENT)
 
+
+API_KEY = config("CHAT_KEY", default=None)
+client = genai.Client(api_key=API_KEY) if API_KEY else None
+
+class ChatAiViewSet(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "description": {"type": "string"},
+                        "subtasks": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "title": {"type": "string"},
+                                    "description": {"type": "string"}
+                                },
+                                "required": ["title", "description"]
+                            }
+                        }
+                    },
+                    "required": ["title", "subtasks"]
+                }
+            },
+            "required": ["task"]
+        }
+
+        INSTRUCTIONS = """
+        Ты — ассистент по декомпозиции задач в таск-менеджере.
+        Твоя задача: разбить описание задачи от пользователя на 3-7 конкретных подзадач.
+        Каждая подзадача должна быть выполнимой за один присест, с чётким описанием действия.
+        Не добавляй лишний текст, не давай советов — только структура задачи и подзадач.
+        И в ответе используй язык вопроса пользователя дабы он смог понять задачу
+        """
+
+
+        user_input = request.data.get('input', None)
+
+        if user_input is None:
+            return Response({"results": "Not found text"},status=status.HTTP_400_BAD_REQUEST)
+
+        if not API_KEY:
+            return Response({"results": "API error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        try:
+            response =async_to_sync(client.aio.models.generate_content)(
+                model="gemini-3.6-flash",
+                contents=user_input,
+                config=types.GenerateContentConfig(
+                    system_instruction=INSTRUCTIONS,
+                    response_mime_type="application/json",
+                    response_schema=schema
+                )
+            )
+
+            if not response.text:
+                return Response({'results': "Empty text"}, status=status.HTTP_502_BAD_GATEWAY)
+            else:
+                import json
+                return Response({"results": json.loads(response.text)}, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response({'results': f'Generation error {e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        
+
+    @action(methods=['post'], detail=False)
+    def created_task(self, request, *args, **kwargs):
+        data = request.data
+
+        task_data = data.get('taskData', None)
+        deadline = data.get('deadLine', None)
+        task_status = data.get('status', None)
+        project_id = data.get('projectId', None)
+
+        if not task_data or not deadline or not task_status or not project_id:
+            return Response({'results': "insufficient data"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not Project.objects.filter(id=project_id).exists():
+            return Response({'results': "not found project"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            new_task = Task.objects.create(
+                status=task_status,
+                project_id=project_id,
+                name=task_data['title'],
+                description="None",
+                created_by=request.user,
+                deadline=deadline,
+            )
+        except (SyntaxError, KeyError) as error:
+            new_task = None
+
+        if new_task:
+            subtasks = task_data['subtasks']
+            subtasks_data = []
+
+            for task in subtasks:
+                subtasks_data.append(SubTask(
+                    task=new_task,
+                    title=task["title"],
+                    description=task["description"],
+                    priority="High",
+                ))
+
+            SubTask.objects.bulk_create(subtasks_data)
+
+
+            return Response({"results": "task created"}, status=status.HTTP_200_OK)
+
+        return Response({'results': "Error creating a task"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

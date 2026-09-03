@@ -65,11 +65,12 @@ class SubTask(models.Model):
         (HIGH_PRIORITY, 'High priority'),
     ]
 
-    
+    task = models.ForeignKey("task.Task",on_delete=models.CASCADE, related_name="subtasks")
     title = models.TextField(max_length=100)
     description = models.TextField(max_length=255)
     priority = models.CharField(max_length=155, choices=PRIORITIES, verbose_name="subtask priority")
     created_at = models.DateTimeField(auto_now_add=True)
+    is_closed = models.BooleanField(default=False)
 
 
 class ActiveTask(models.Model):
