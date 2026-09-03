@@ -1179,7 +1179,10 @@ class StratagemViewSets(viewsets.ViewSet):
 
 
 API_KEY = config("CHAT_KEY", default=None)
-client = genai.Client(api_key=API_KEY) if API_KEY else None
+client = genai.Client(
+    api_key=API_KEY,
+    http_options=types.HttpOptions(timeout=10000)
+) if API_KEY else None
 
 class ChatAiViewSet(viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
