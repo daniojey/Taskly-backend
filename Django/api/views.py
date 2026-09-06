@@ -1181,7 +1181,7 @@ class StratagemViewSets(viewsets.ViewSet):
 API_KEY = config("CHAT_KEY", default=None)
 client = genai.Client(
     api_key=API_KEY,
-    http_options=types.HttpOptions(timeout=10000)
+    http_options=types.HttpOptions(timeout=120000)
 ) if API_KEY else None
 
 class ChatAiViewSet(viewsets.ViewSet):
@@ -1251,6 +1251,7 @@ class ChatAiViewSet(viewsets.ViewSet):
                 return Response({"results": json.loads(response.text)}, status=status.HTTP_200_OK)
             
         except Exception as e:
+            print("error", e)
             return Response({'results': f'Generation error {e}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         
