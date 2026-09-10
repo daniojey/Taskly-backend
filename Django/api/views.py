@@ -1,4 +1,5 @@
 import mimetypes
+from re import S
 from asgiref.sync import async_to_sync
 from decouple import config
 from django.conf import settings
@@ -36,7 +37,7 @@ from task.models import ActiveTask, Project, Stratagem, SubTask, Task, TaskComme
 from .serializers.group_logs_serializers import GroupLogsSerializer
 from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer, TaskimageSerializer
-from .serializers.task_serializers import ActiveTaskSerializer, TaskCreateSerializer, TaskSerializer
+from .serializers.task_serializers import ActiveTaskSerializer, SubTaskSerializer, TaskCreateSerializer, TaskSerializer
 from .serializers.user_serializers import CreateUserSerializer, UserPerformerSerializer, UserSerializer
 from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer, GroupCountProjectsSerializer
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator, PerformerSessionsPaginator
@@ -715,6 +716,50 @@ class TaskViewSet(viewsets.ViewSet):
         
         
         return Response({'results': "removed from active status", "status": False}, status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=True)
+    def get_subtasks(self, request, pk=None, *args, **kwargs):
+
+        try:
+            task = Task.objects.prefetch_related("subtasks").get(id=pk)
+        except Task.DoesNotExist:
+            return Response({"results": "Objects not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        subtasks = task.subtasks.all().order_by("-is_closed", "id")
+
+        print(subtasks)
+
+        serializer = SubTaskSerializer(subtasks, many=True)
+
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
+    @action(methods=['patch'],detail=True)
+    def suptask_update(self, request, pk=None, *args, **kwargs):
+        try:
+            subTask = SubTask.objects.prefetch_related(
+                Prefetch(
+                    "task",
+                    queryset=Task.objects.all().select_related("created_by"),
+                    to_attr="task_owner"
+                ),
+            ).get(id=pk)
+        except Task.DoesNotExist:
+            return Response({"results": "Objects not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if subTask.task_owner.id == request.user.id:
+            serializer = SubTaskSerializer(subTask, data=request.data, partial=True)
+
+            if serializer.is_valid():
+                serializer.save()
+
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
+            else:
+                return Response({"results": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            return Response({"results": "Not permission access"}, status=status.HTTP_403_FORBIDDEN)
+        
 
 
 class NotificationViewSet(CacheMixin, viewsets.ViewSet):
