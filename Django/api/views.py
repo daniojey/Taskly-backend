@@ -746,8 +746,8 @@ class TaskViewSet(viewsets.ViewSet):
         except Task.DoesNotExist:
             return Response({"results": "Objects not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        print(subTask.task_owner.id, request.user.id)
-        if subTask.task_owner.id == request.user.id:
+        print(subTask.task_owner.created_by.id, request.user.id, subTask.task_owner.id)
+        if subTask.task_owner.created_by.id == request.user.id:
             serializer = SubTaskSerializer(subTask, data=request.data, partial=True)
 
             if serializer.is_valid():
