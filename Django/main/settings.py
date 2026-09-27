@@ -210,13 +210,15 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '10000/day',
         'user': '10000000000/day'
-    }
+    },
+
+    "EXCEPTION_HANDLER" : "main.utils.custom_exception_handler"
 }
 
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=40),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=4),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=3),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,

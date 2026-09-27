@@ -47,6 +47,7 @@ from .serializers.project_serializers import (
     ProjectWithTasksSerializer, 
     ProjectWithoutTasksSerializer
 )
+from api.service.task_service import TaskService
 
 
 
@@ -564,11 +565,11 @@ class GroupProjectViewSet(CacheMixin,viewsets.ViewSet):
 
             return Response({"message": "success delete project"}, status=status.HTTP_204_NO_CONTENT)
 
+
 class TaskViewSet(viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     throttle_classes = [UserRateThrottle]
-
 
     def get_queryset(self):
         project_id = self.kwargs.get('project_id', None)
@@ -594,42 +595,19 @@ class TaskViewSet(viewsets.ViewSet):
     def create(self, request, *args, **kwargs):
         project = self.get_project()
 
-        data = request.data
-        data['project'] = project.id
-        data['created_by'] = request.user.id if hasattr(request, 'user') else None
-        serializer = TaskCreateSerializer(data=data)
+        result = TaskService.create_task(
+            request=request, 
+            project=project
+        )
 
-
-        if serializer.is_valid():
-            serializer.save()
-            
-            return Response({'result': serializer.data}, status=status.HTTP_201_CREATED)
-        else:
-            print(serializer.errors)
-            return Response({'errors': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"results": result}, status=status.HTTP_201_CREATED)
         
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
 
-        if instance.owner.id != request.user.id:
-            return Response({'message': 'forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        TaskService.partial_update_task(request, instance)
 
-        serializer = TaskSerializer(
-            instance,
-            data=request.data,
-            partial=True,
-            context={'method': 'path'}
-        )
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(
-                {"message":"Task partially updated!", 'result': serializer.data},
-                status=status.HTTP_200_OK
-            )
-        
-        return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-
+        return Response({'results': "Task update complete"})
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -640,37 +618,16 @@ class TaskViewSet(viewsets.ViewSet):
     
     @action(detail=True, methods=['post'])
     def update_status(self, request, pk=None, *args, **kwargs):
-
         task = Task.objects.get(pk=pk)
 
-        data = request.data
-
-        new_status = data.get('new_status', None)
-
-        if new_status and task.status != new_status:
-            task.status = new_status
-            task.save()
-
-
-        if IS_ENABLE_CELERY:
-            create_notify_users.delay(notify_type=Notification.TASK_UPDATE_MESSAGE,group_id=task.group.id, task_name=task.name, task_status=task.status)
-        else:
-            create_notify_users(notify_type=Notification.TASK_UPDATE_MESSAGE, group_id=task.group.id, task_name=task.name, task_status=task.status)
-        # chanel_layer = get_channel_layer()
-        # async_to_sync(chanel_layer.group_send)(f"base_group_{user.id}", {'type': 'chat_message', 'message': 'lobzik', 'datas': 'data1', 'task_id': task.id})
+        TaskService.update_task_status(request, task)
 
         return Response({'result': task.status}, status=status.HTTP_200_OK)
 
     def retrieve(self, request, pk=None, *args, **kwargs):
-        if pk:
-            try:
-                task = Task.objects.get(pk=pk)
-            except Task.DoesNotExist:
-                return Response({'message': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        task_data = TaskService.get_task(pk)
 
-            serializer = TaskSerializer(task, context={"method": 'get'})
-
-            return Response({'result': serializer.data}, status=status.HTTP_200_OK)
+        return Response({'result': task_data}, status=status.HTTP_200_OK)
         
 
     def delete(self, request, pk=None, *args, **kwargs):

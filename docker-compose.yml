@@ -60,6 +60,7 @@ services:
     networks:
       - app-network
     environment:
+        REDIS_URL: redis://redis:6379/0
         DATABASE_URL: ${DATABESE_URL_DOCKER}
         CELERY_BROKER_URL: redis://redis:6379/0
         CELERY_RESULT_BACKEND: redis://redis:6379/0
@@ -79,6 +80,7 @@ services:
     command: celery -A main beat -l DEBUG
     environment:
         DATABASE_URL: ${DATABESE_URL_DOCKER}
+        REDIS_URL: redis://redis:6379/0
         CELERY_BROKER_URL: redis://redis:6379/0
         CELERY_RESULT_BACKEND: redis://redis:6379/0
     networks:
