@@ -212,7 +212,7 @@ REST_FRAMEWORK = {
         'user': '10000000000/day'
     },
 
-    "EXCEPTION_HANDLER" : "main.utils.custom_exception_handler"
+    "EXCEPTION_HANDLER" : "main.utils.custom_exception_handler.custom_exception_handler"
 }
 
 

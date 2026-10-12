@@ -1,5 +1,29 @@
 from rest_framework.exceptions import APIException
 
+
+# AUTH
+class UncorrectToken(APIException):
+    status_code = 400
+    default_detail = "Not valid token"
+    default_code = "error"
+
+class NotFoundToken(APIException):
+    status_code = 404
+    default_detail = "Not found token"
+    default_code = "error"
+
+class NotFoundRefreshToken(APIException):
+    status_code = 404
+    default_detail = "Not found refresh token"
+    default_code = "error"
+
+# User
+class UserNotFound(APIException):
+    status_code = 404
+    default_detail = "User not found"
+    default_code = "error"
+
+# TaskView
 class ForbiddenAPIException(APIException):
     status_code = 403
     default_detail = "You do not have access to this information"

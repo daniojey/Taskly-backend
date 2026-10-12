@@ -10,6 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
+from rest_framework.serializers import ReturnDict
 from rest_framework.generics import ListAPIView
 from django.http import FileResponse, JsonResponse
 from rest_framework.permissions import IsAuthenticated
@@ -22,6 +23,8 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
 
 
+from api.service.token_service import JWTTokenService
+from main.utils.custom_api_errors import NotFoundRefreshToken
 from api.serializers.stratagems_serializers import StratagemCreateSerializer, StratagemShortSerializer
 from common.cache_managers.project_cache import ProjectCacheManager
 from api.permissions import OwnerOrReadOnly
@@ -74,27 +77,7 @@ class CustomTokenPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
 
-        if response.status_code == 200:
-            new_response = Response({
-                'access': response.data['access'],
-                'user': {
-                    'id': request.user.id if hasattr(request, 'user') else None,
-                    'username': request.data.get('username', None)
-                }
-            }, status=status.HTTP_200_OK)
-
-            new_response.set_cookie(
-                'refresh',
-                response.data['refresh'],
-                max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
-                httponly=True,
-                samesite=settings.CSRF_COOKIE_SAMESITE,
-                secure=settings.CSRF_COOKIE_SECURE,
-            )
-
-            return new_response
-        
-        return response
+        return JWTTokenService.token_pair(request, response)
 
 
 class CustomTokenRefreshView(TokenRefreshView):
@@ -103,36 +86,16 @@ class CustomTokenRefreshView(TokenRefreshView):
         refresh_token = request.COOKIES.get('refresh')
 
         if not refresh_token:
-            return Response({
-                'message': 'Token not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-
+            raise NotFoundRefreshToken()
+        
         data = request.data.copy()
         data['refresh'] = refresh_token
-
-        request._full_data = data       
-        # request.data['refresh'] = refresh_token
-
+        
+        request._full_data = data
+        
         response = super().post(request, *args, **kwargs)
 
-        if response.status_code == 200:
-            if 'refresh' in response.data:
-                new_refresh_token = response.data['refresh']
-
-                response.set_cookie(
-                    'refresh',
-                    new_refresh_token,
-                    max_age=settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
-                    secure=settings.CSRF_COOKIE_SECURE,
-                    samesite=settings.CSRF_COOKIE_SAMESITE,
-                    httponly=True,
-                )
-
-                del response.data['refresh']
-
-        return response
-    
-
+        return JWTTokenService.token_refresh(response)
     
 class LogoutTokenApiView(APIView):
     def post(self, request, *args, **kwargs):
@@ -148,30 +111,8 @@ class CustomTokenVerifyView(TokenVerifyView):
     def post(self, request, *args, **kwargs):
         token = request.data.get('token')
 
-        if not token:
-            return Response(
-                {"error": 'Token not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        try:
-            access_token = AccessToken(token)
-            user_id = access_token.get('user_id')
+        return JWTTokenService.check_token(token)
 
-            user = User.objects.get(id=user_id)
-            user_data = UserSerializer(user).data
-
-            return Response(
-                {"message": "Token is valid", "user": user_data},
-                status=status.HTTP_200_OK,
-            )
-        
-        except TokenError as e:
-            raise InvalidToken(e.args[0])
-        except User.DoesNotExist:
-            return Response(
-                {"error": "User not found"}, status=status.HTTP_404_NOT_FOUND
-            )
 
 class UserProfileAPiView(APIView):
 

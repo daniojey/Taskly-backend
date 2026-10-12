@@ -2,9 +2,32 @@ from rest_framework.views import exception_handler
 from rest_framework.response import Response
 from rest_framework import status
 
-from Django.main.utils.custom_api_errors import ForbiddenAPIException, TaskCreateNotValidData, TaskNotFoundId, TaskUpdateNotValidData
+from main.utils.custom_api_errors import (
+    # Auth
+    UncorrectToken,
+    NotFoundToken,
+    NotFoundRefreshToken,
+
+    #User
+    UserNotFound,
+
+    # TaskView
+    ForbiddenAPIException, 
+    TaskCreateNotValidData, 
+    TaskNotFoundId, 
+    TaskUpdateNotValidData
+)
 
 def custom_exception_handler(exc, context):
+    # AUTH
+    if isinstance(exc, UncorrectToken):
+        return Response({'detail': str(exc)}, status=UncorrectToken.status_code)
+    if isinstance(exc, NotFoundToken):
+        return Response({'detail': str(exc)}, status=NotFoundToken.status_code)
+    if isinstance(exc, NotFoundRefreshToken):
+        return Response({'detail': str(exc)}, status=NotFoundRefreshToken.status_code)
+
+    # TaskViewSet
     if isinstance(exc, TaskCreateNotValidData):
         return Response({'detail': str(exc)}, status=TaskCreateNotValidData.status_code)
     if isinstance(exc, TaskUpdateNotValidData):
@@ -14,4 +37,8 @@ def custom_exception_handler(exc, context):
     if isinstance(exc, TaskNotFoundId):
         return Response({"detail": str(exc)}, status=TaskNotFoundId.status_code)
 
+    # User
+    if isinstance(exc, UserNotFound):
+        return Response({'detail': str(exc)}, status=UserNotFound.status_code)
+    
     return exception_handler(exc, context)
