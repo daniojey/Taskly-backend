@@ -17,6 +17,23 @@ class NotFoundRefreshToken(APIException):
     default_detail = "Not found refresh token"
     default_code = "error"
 
+# Group
+class GroupNotFound(APIException):
+    status_code = 404
+    default_detail = "Group not found"
+    default_code = "error"
+
+class GroupForbidden(APIException):
+    status_code = 403
+    default_detail = "Group forbidden"
+    default_code = "error"
+
+class UserAlreadyExistInGroup(APIException):
+    status_code = 400
+    default_detail = "This user already exist in this group"
+    default_code = "error"
+
+
 # User
 class UserNotFound(APIException):
     status_code = 404
@@ -43,4 +60,18 @@ class TaskUpdateNotValidData(APIException):
 class TaskNotFoundId(APIException):
     status_code = 404
     default_detail = "Not found task id"
+    default_code = "error"
+
+
+# Notification
+class NotFoundNotifyData(APIException):
+    status_code = 404
+    default_detail = "Not found user data"
+    default_code = "error"
+
+
+# Other
+class NotFoundValueInData(APIException):
+    status_code = 400
+    default_detail = "Not found variable in data"
     default_code = "error"
