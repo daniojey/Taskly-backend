@@ -10,19 +10,18 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404
-from rest_framework.serializers import ReturnDict
 from rest_framework.generics import ListAPIView
 from django.http import FileResponse, JsonResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import UserRateThrottle
-from rest_framework_simplejwt.tokens import AccessToken
 from django.db.models import Q, BooleanField, Case, Count, Prefetch, Exists, OuterRef, Value, When
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.authentication import SessionAuthentication
-from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
+from rest_framework.exceptions import ValidationError
 
 
+from api.serializers.subtasks_serializers import CreateSubTaskSerializer
 from api.service.group_service import GroupService
 from api.service.token_service import JWTTokenService
 from main.utils.custom_api_errors import NotFoundRefreshToken
@@ -490,6 +489,24 @@ class TaskViewSet(viewsets.ViewSet):
 
         else:
             return Response({"results": "Not permission access"}, status=status.HTTP_403_FORBIDDEN)
+
+
+class SubTaskViewSet(viewsets.ViewSet):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+
+
+        serializer = CreateSubTaskSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'results': serializer.data}, status=status.HTTP_201_CREATED)
+        else:
+            print(serializer.errors)
+            raise ValidationError
         
 
 

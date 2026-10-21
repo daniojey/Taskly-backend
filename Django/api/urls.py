@@ -14,6 +14,7 @@ from .views import (
     LogoutTokenApiView,
     NotificationViewSet,
     StratagemViewSets,
+    SubTaskViewSet,
     TaskPerformersViewSets,
     TaskSessionViewSets,
     TaskStatisticsViewSets,
@@ -41,6 +42,7 @@ router.register('task-sessions', TaskSessionViewSets, basename='task-sessions')
 router.register('task-statistics', TaskStatisticsViewSets, basename='task-statistics')
 router.register('stratagems', StratagemViewSets, basename='stratagems')
 router.register('task-helper', ChatAiViewSet, basename='task-helper')
+router.register('subtasks', SubTaskViewSet, basename='subtasks')
 
 
 urlpatterns = [
