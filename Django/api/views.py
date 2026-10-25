@@ -3,6 +3,7 @@ from re import S
 from asgiref.sync import async_to_sync
 from decouple import config
 from django.conf import settings
+from django.db import transaction
 from django.utils.timezone import timedelta
 from rest_framework.views import APIView
 from rest_framework import viewsets, status
@@ -24,7 +25,7 @@ from rest_framework.exceptions import ValidationError
 from api.serializers.subtasks_serializers import CreateSubTaskSerializer
 from api.service.group_service import GroupService
 from api.service.token_service import JWTTokenService
-from main.utils.custom_api_errors import NotFoundRefreshToken
+from main.utils.custom_api_errors import ForbiddenAccessSubTasks, NotFoundData, NotFoundRefreshToken, TaskNotFoundId
 from api.serializers.stratagems_serializers import StratagemCreateSerializer, StratagemShortSerializer
 from common.cache_managers.project_cache import ProjectCacheManager
 from api.permissions import OwnerOrReadOnly
@@ -454,9 +455,7 @@ class TaskViewSet(viewsets.ViewSet):
         except Task.DoesNotExist:
             return Response({"results": "Objects not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        subtasks = task.subtasks.all().order_by("-is_closed", "id")
-
-        print(subtasks)
+        subtasks = task.subtasks.all().order_by("position")
 
         serializer = SubTaskSerializer(subtasks, many=True)
 
@@ -498,15 +497,82 @@ class SubTaskViewSet(viewsets.ViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
+        task_id = data.get("task", None)
+
+        if not task_id:
+            raise TaskNotFoundId
+
+        task = Task.objects.get(id=task_id)
+        last_subtask = task.subtasks.order_by("-id").first()
 
 
-        serializer = CreateSubTaskSerializer(data=data)
+        serializer = CreateSubTaskSerializer(data=data, context={'position': last_subtask.id + 1})
         if serializer.is_valid():
             serializer.save()
             return Response({'results': serializer.data}, status=status.HTTP_201_CREATED)
         else:
             print(serializer.errors)
             raise ValidationError
+        
+
+    @action(methods=["post"],detail=False)
+    def reorder(self, request, *args, **kwargs):
+        task_id = request.data.get("task_id", None)
+        ordering_ids = request.data.get('reorder', None)
+
+        if not ordering_ids:
+            raise NotFoundData
+
+        if not task_id:
+            raise TaskNotFoundId
+
+        task = Task.objects.get(id=task_id)
+
+        
+        with transaction.atomic():
+            subtasks = list(
+                task.subtasks.select_for_update().filter(task=task)
+            )
+            
+            by_id = {s.id: s for s in subtasks}
+            
+            if len(ordering_ids) != len(set(ordering_ids)) or set(ordering_ids) != by_id.keys():
+                raise ValidationError({"order": 'Invalid subtask ids'})
+
+            
+            changed = []
+            for index, subtask_id in enumerate(ordering_ids):
+                subtask  = by_id[subtask_id]
+                if subtask.position != index:
+                    subtask.position = index
+                    changed.append(subtask)
+
+            if changed:
+                SubTask.objects.bulk_update(changed, ['position'])
+
+
+        return Response({'results': 'ok'}, status=status.HTTP_200_OK)
+
+
+    def destroy(self, request, pk=None, *args, **kwargs):
+        subtask = SubTask.objects.prefetch_related(
+            Prefetch(
+                "task",
+                queryset=Task.objects.select_related("created_by").all(),
+                to_attr="task_owner"
+            )
+        ).get(pk=pk)
+
+        print(subtask.task_owner.created_by)
+
+        if subtask.task_owner.created_by.id != request.user.id:
+            raise ForbiddenAccessSubTasks
+
+        
+        subtask.delete()
+
+        return Response({'results': "SubTask Deleted"}, status=status.HTTP_204_NO_CONTENT)
+
         
 
 

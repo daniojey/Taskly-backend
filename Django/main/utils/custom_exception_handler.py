@@ -4,8 +4,10 @@ from rest_framework import status
 
 from main.utils.custom_api_errors import (
     # Auth
+    ForbiddenAccessSubTasks,
     GroupForbidden,
     GroupNotFound,
+    NotFoundData,
     NotFoundNotifyData,
     NotFoundValueInData,
     UncorrectToken,
@@ -42,6 +44,10 @@ def custom_exception_handler(exc, context):
     if isinstance(exc, TaskNotFoundId):
         return Response({"detail": str(exc)}, status=TaskNotFoundId.status_code)
 
+    # SubTask
+    if isinstance(exc, ForbiddenAccessSubTasks):
+        return Response({'detail': str(exc)}, status=ForbiddenAccessSubTasks.status_code)
+
     # Group
     if isinstance(exc, GroupNotFound):
         return Response({'detail': str(exc)}, status=GroupNotFound.status_code)
@@ -61,6 +67,8 @@ def custom_exception_handler(exc, context):
     # Other
     if isinstance(exc, NotFoundValueInData):
         return Response({'detail': str(exc)}, status=NotFoundValueInData.status_code)
+    if isinstance(exc, NotFoundData):
+        return Response({'detail': str(exc)}, status=NotFoundData.status_code)
 
     
     return exception_handler(exc, context)

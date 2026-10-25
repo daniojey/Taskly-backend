@@ -66,6 +66,7 @@ class SubTask(models.Model):
     ]
 
     task = models.ForeignKey("task.Task",on_delete=models.CASCADE, related_name="subtasks")
+    position = models.PositiveIntegerField(verbose_name="subtask_position", default=0)
     title = models.TextField(max_length=100)
     description = models.TextField(max_length=255)
     priority = models.CharField(max_length=155, choices=PRIORITIES, verbose_name="subtask priority")

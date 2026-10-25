@@ -62,6 +62,11 @@ class TaskNotFoundId(APIException):
     default_detail = "Not found task id"
     default_code = "error"
 
+# SubTask
+class ForbiddenAccessSubTasks(APIException):
+    status_code = 403
+    default_detail = "Forbidden"
+    default_code = "error"
 
 # Notification
 class NotFoundNotifyData(APIException):
@@ -74,4 +79,9 @@ class NotFoundNotifyData(APIException):
 class NotFoundValueInData(APIException):
     status_code = 400
     default_detail = "Not found variable in data"
+    default_code = "error"
+
+class NotFoundData(APIException):
+    status_code = 404
+    default_detail = "Not found data"
     default_code = "error"

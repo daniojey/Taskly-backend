@@ -154,7 +154,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Europe/Kyiv'
+TIME_ZONE = 'Europe/Warsaw'
+
+CELERY_ENABLE_UTC = True
+CELERY_TIMEZONE = 'UTC'
 
 USE_L10N = True
 USE_I18N = True
