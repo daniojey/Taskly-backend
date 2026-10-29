@@ -85,3 +85,10 @@ class NotFoundData(APIException):
     status_code = 404
     default_detail = "Not found data"
     default_code = "error"
+
+
+# Projects
+class NotFoundProjectId(APIException):
+    status_code = 404
+    default_detail = "Not found project"
+    default_code = "error"

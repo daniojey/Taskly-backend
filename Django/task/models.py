@@ -83,6 +83,9 @@ class ActiveTask(models.Model):
         db_table = 'Active_Task'
         verbose_name = 'Active task'
         verbose_name_plural = 'Active tasks'
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'task'], name="unique_active_task")
+        ]
 
 
 class TaskPerformSession(models.Model):

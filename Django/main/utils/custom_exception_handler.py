@@ -9,6 +9,7 @@ from main.utils.custom_api_errors import (
     GroupNotFound,
     NotFoundData,
     NotFoundNotifyData,
+    NotFoundProjectId,
     NotFoundValueInData,
     UncorrectToken,
     NotFoundToken,
@@ -33,6 +34,10 @@ def custom_exception_handler(exc, context):
         return Response({'detail': str(exc)}, status=NotFoundToken.status_code)
     if isinstance(exc, NotFoundRefreshToken):
         return Response({'detail': str(exc)}, status=NotFoundRefreshToken.status_code)
+
+    #Projects
+    if isinstance(exc ,NotFoundProjectId):
+        return Response({'detail': str(exc)}, status=NotFoundProjectId.status_code)
 
     # TaskViewSet
     if isinstance(exc, TaskCreateNotValidData):

@@ -9,9 +9,9 @@ from rest_framework.serializers import ReturnDict
 class TaskService:
 
     @staticmethod
-    def create_task(request, project: Project):
+    def create_task(request, project_id: Project):
         data = request.data
-        data['project'] = project.id
+        data['project'] = project_id
         data['created_by'] = request.user.id if hasattr(request, 'user') else None
 
         serializer = TaskCreateSerializer(data=data)
@@ -65,17 +65,3 @@ class TaskService:
                 task_name=task.name, 
                 task_status=task.status
             )
-
-    @staticmethod
-    def get_task(pk: Task.id) -> ReturnDict:
-        try:
-            task = Task.objects.get(pk=pk)
-        except Task.DoesNotExist:
-            raise TaskNotFoundId
-
-        serializer = TaskSerializer(
-            task,
-            context={"method": 'get'}
-        )
-
-        return serializer.data

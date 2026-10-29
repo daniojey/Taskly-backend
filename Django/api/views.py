@@ -1,5 +1,6 @@
 import mimetypes
 from re import S
+from anyio.lowlevel import D
 from asgiref.sync import async_to_sync
 from decouple import config
 from django.conf import settings
@@ -22,13 +23,14 @@ from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView,
 from rest_framework.exceptions import ValidationError
 
 
+
+from api.permissions.core_permissions import IsTaskOwner, OwnerOrReadOnly
 from api.serializers.subtasks_serializers import CreateSubTaskSerializer
 from api.service.group_service import GroupService
 from api.service.token_service import JWTTokenService
-from main.utils.custom_api_errors import ForbiddenAccessSubTasks, NotFoundData, NotFoundRefreshToken, TaskNotFoundId
+from main.utils.custom_api_errors import ForbiddenAccessSubTasks, NotFoundData, NotFoundProjectId, NotFoundRefreshToken, TaskNotFoundId
 from api.serializers.stratagems_serializers import StratagemCreateSerializer, StratagemShortSerializer
 from common.cache_managers.project_cache import ProjectCacheManager
-from api.permissions import OwnerOrReadOnly
 from api.serializers.session_performer_serializer import SessionSerializerWithDate, TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
 from common.cache_managers.group_cache import GroupCacheManager
 from main import settings
@@ -339,38 +341,50 @@ class GroupProjectViewSet(CacheMixin,viewsets.ViewSet):
             return Response({"message": "success delete project"}, status=status.HTTP_204_NO_CONTENT)
 
 
-class TaskViewSet(viewsets.ViewSet):
+class TaskViewSet(viewsets.GenericViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     throttle_classes = [UserRateThrottle]
 
     def get_queryset(self):
-        project_id = self.kwargs.get('project_id', None)
+        user = self.request.user
+        qs = (
+            Task.objects
+            .filter(project__group__members=user)
+            .select_related('owner', 'project')
+            .annotate(is_active=Exists(
+                ActiveTask.objects.filter(task=OuterRef('pk'), user=user)
+            ))
+        )
+
+        project_id = self.kwargs.get('project_id')
+        return qs.filter(project_id=project_id) if project_id else qs
+
+
+    def get_permissions(self):
+        if self.action == "destroy":
+            return [IsAuthenticated(), IsTaskOwner()]
+        return super().get_permissions()
+
+
+    def get_serializer_class(self):
+        return {'list': TaskSerializer}.get(self.action, TaskSerializer)
+
+
+    def get_project_id(self):
+        project_id = self.request.data.get("project_id", None)
 
         if project_id:
-            tasks = Task.objects.select_related("owner", 'project').filter(project__id=project_id)
+            return project_id
         else:
-            tasks  = Task.objects.select_related("owner", 'project').all()
-        return tasks
-    
-    def get_project(self):
-        project_id = self.kwargs.get('project_id', None)
-
-        project = get_object_or_404(Project.objects.select_related('group'), id=project_id)
-
-        return project
-    
-    def get_object(self):
-        queryset = self.get_queryset()
-        obj = get_object_or_404(queryset, pk=self.kwargs.get('pk'))
-        return obj
+            raise NotFoundProjectId
     
     def create(self, request, *args, **kwargs):
-        project = self.get_project()
+        project_id = self.get_project_id()
 
         result = TaskService.create_task(
             request=request, 
-            project=project
+            project_id=project_id
         )
 
         return Response({"results": result}, status=status.HTTP_201_CREATED)
@@ -398,96 +412,32 @@ class TaskViewSet(viewsets.ViewSet):
         return Response({'result': task.status}, status=status.HTTP_200_OK)
 
     def retrieve(self, request, pk=None, *args, **kwargs):
-        task_data = TaskService.get_task(pk)
-
-        return Response({'result': task_data}, status=status.HTTP_200_OK)
+        return Response({'results': self.get_serializer(self.get_object()).data})
         
-
-    def delete(self, request, pk=None, *args, **kwargs):
-        if pk:
-            try:
-                task = Task.objects.select_related("owner").get(pk=pk)
-            except Task.DoesNotExist:
-                return Response({'message': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-            
-            if task.owner.id == request.user.id:
-                task.delete()
-            else:
-                return Response({'message': 'forbidden'}, status=status.HTTP_403_FORBIDDEN)
-
-            return Response({'message':'success delete'}, status=status.HTTP_204_NO_CONTENT)
-        
+    def destroy(self, request, pk=None, *args, **kwargs):
+        self.get_object().delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
     @action(methods=['get'], detail=False)
     def get_active_tasks(self, request, *args, **kwargs):
         user = request.user
-        tasks = ActiveTask.objects.select_related('user', 'task', 'task__project').filter(user=user)
+        tasks = ActiveTask.objects.select_related('task', 'task__project').filter(user=user)
         serializer = ActiveTaskSerializer(tasks, many=True)
         return Response({ 'results': serializer.data}, status=status.HTTP_200_OK)
     
-    @action(methods=['get'], detail=True)
-    def get_is_active_task(self, request, pk=None, *args, **kwargs):
-        is_active_task = ActiveTask.objects.filter(task__id=pk, user__id=request.user.id).exists()
-        return Response({ "results": is_active_task}, status=status.HTTP_200_OK)
-    
-    @action(methods=['post'], detail=True)
-    def change_active_task(self, request, pk=None, *args, **kwargs):
+    @action(methods=['get', 'put', 'delete'], detail=True)
+    def active(self, request, pk=None):
+        task = self.get_object()
 
-        active_task = ActiveTask.objects.filter(
-            user=request.user, task__id=pk
-        ).exists()
-
-        if active_task:
-            ActiveTask.objects.filter(user=request.user, task__id=pk).delete()
-        else:
-            task = Task.objects.get(id=pk)
-            active = ActiveTask.objects.create(user=request.user, task=task)
-            active.refresh_from_db()
-            return Response({ 'results': "added task in active tasks list", 'status': True}, status=status.HTTP_201_CREATED)
-        
-        
-        return Response({'results': "removed from active status", "status": False}, status=status.HTTP_200_OK)
-
-    @action(methods=['get'], detail=True)
-    def get_subtasks(self, request, pk=None, *args, **kwargs):
-
-        try:
-            task = Task.objects.prefetch_related("subtasks").get(id=pk)
-        except Task.DoesNotExist:
-            return Response({"results": "Objects not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        subtasks = task.subtasks.all().order_by("position")
-
-        serializer = SubTaskSerializer(subtasks, many=True)
-
-        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
-
-    @action(methods=['patch'],detail=True)
-    def suptask_update(self, request, pk=None, *args, **kwargs):
-        try:
-            subTask = SubTask.objects.prefetch_related(
-                Prefetch(
-                    "task",
-                    queryset=Task.objects.all().select_related("created_by"),
-                    to_attr="task_owner"
-                ),
-            ).get(id=pk)
-        except Task.DoesNotExist:
-            return Response({"results": "Objects not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        print(subTask.task_owner.created_by.id, request.user.id, subTask.task_owner.id)
-        if subTask.task_owner.created_by.id == request.user.id:
-            serializer = SubTaskSerializer(subTask, data=request.data, partial=True)
-
-            if serializer.is_valid():
-                serializer.save()
-
-                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
-
-            else:
-                return Response({"results": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-
-        else:
-            return Response({"results": "Not permission access"}, status=status.HTTP_403_FORBIDDEN)
+        if request.method == "GET":
+            active_task = ActiveTask.objects.filter(task=task).exists()
+            return Response({'results': active_task}, status=status.HTTP_200_OK)
+        elif request.method == 'PUT':
+            ActiveTask.objects.get_or_create(user=request.user, task=task)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        elif request.method == 'DELETE':
+            ActiveTask.objects.filter(user=request.user, task=task).delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SubTaskViewSet(viewsets.ViewSet):
@@ -495,6 +445,25 @@ class SubTaskViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
     throttle_classes = [UserRateThrottle]
 
+    def task_check_exists(self, task_id):
+        task = Task.objects.filter(id=task_id).exists()
+        print(task)
+
+        if not task:
+            raise TaskNotFoundId
+
+    @action(methods=['get'], detail=True)
+    def get_subtasks(self, request, pk=None, *args, **kwargs):
+        self.task_check_exists(task_id=pk)
+
+        subtasks = SubTask.objects.filter(
+            task_id=pk,
+            task__project__group__members=request.user
+        ).order_by('position')
+        serializer = SubTaskSerializer(subtasks, many=True)
+
+        return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+        
     def create(self, request, *args, **kwargs):
         data = request.data
         task_id = data.get("task", None)
@@ -513,7 +482,15 @@ class SubTaskViewSet(viewsets.ViewSet):
         else:
             print(serializer.errors)
             raise ValidationError
-        
+
+    def partial_update(self, request, pk, *args, **kwargs):
+        instance = SubTask.objects.get(pk=pk)
+
+        serializer = SubTaskSerializer(instance, data=request.data, partial=True)
+
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response({'results': serializer.data},status=status.HTTP_200_OK)
 
     @action(methods=["post"],detail=False)
     def reorder(self, request, *args, **kwargs):
@@ -527,7 +504,6 @@ class SubTaskViewSet(viewsets.ViewSet):
             raise TaskNotFoundId
 
         task = Task.objects.get(id=task_id)
-
         
         with transaction.atomic():
             subtasks = list(
@@ -572,8 +548,6 @@ class SubTaskViewSet(viewsets.ViewSet):
         subtask.delete()
 
         return Response({'results': "SubTask Deleted"}, status=status.HTTP_204_NO_CONTENT)
-
-        
 
 
 class NotificationViewSet(CacheMixin, viewsets.ViewSet):
