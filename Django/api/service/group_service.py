@@ -5,7 +5,6 @@ from rest_framework import status
 from api.utils import GroupLogger
 from api.tasks import create_notify_user
 from main.settings import IS_ENABLE_CELERY
-from common.cache_managers.group_cache import GroupCacheManager
 from common.mixins import CacheMixin
 from main.utils.custom_api_errors import GroupForbidden, GroupNotFound, NotFoundValueInData, UserAlreadyExistInGroup, UserNotFound
 from api.serializers.group_serializers import GroupCountProjectsSerializer, GroupCreateSerializer, GroupDetailSerializer
@@ -17,7 +16,7 @@ from rest_framework.response import Response
 class GroupService:
 
     @staticmethod
-    def get_list_queryset(request, filter_projects, user, cache_mixin: CacheMixin):
+    def get_list_queryset(request, filter_projects, user):
 
         match filter_projects:
             case 'A-z':
@@ -29,7 +28,7 @@ class GroupService:
             case _:
                 order_by = 'created_at'
         
-        queryset = request.user.user_groups.prefetch_related(
+        groups = request.user.user_groups.prefetch_related(
             Prefetch(
                 'projects',
                     queryset=Project.objects.all(),
@@ -43,14 +42,13 @@ class GroupService:
                 )
             ).order_by(order_by).all()
         
-        groups = cache_mixin(queryset, f"groups_filter_{filter_projects}_user_{user.id}", 60)
         
         serializer = GroupCountProjectsSerializer(groups, many=True, context={"include_projects": True})
         
         return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 
     @staticmethod
-    def get_group(request, user, set_cache, group_id):
+    def get_group(request, user, group_id):
         try:
             query = Group.objects.prefetch_related(
                 Prefetch(
@@ -81,7 +79,6 @@ class GroupService:
         
             if query.members.filter(id=user.id).exists():
                 serializer = GroupDetailSerializer(query, context={'request': request})
-                set_cache(serializer.data, f"group_{group_id}_user_{user.id}", 50)
         
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
             else:
@@ -101,12 +98,6 @@ class GroupService:
 
         if serializer.is_valid():
             serializer.save()
-
-
-            GroupCacheManager.clean_group_list_cache(
-                filters=['A-z', 'Z-a', 'created', ''],
-                user_id=request.user.id
-            )
 
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         else:

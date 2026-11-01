@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'rest_framework',
     "corsheaders",
     'silk',
+    'django_filters',
 
     'api',
     'task',

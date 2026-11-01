@@ -1,11 +1,10 @@
 import mimetypes
-from re import S
-from anyio.lowlevel import D
 from asgiref.sync import async_to_sync
 from decouple import config
 from django.conf import settings
 from django.db import transaction
 from django.utils.timezone import timedelta
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -16,7 +15,7 @@ from rest_framework.generics import ListAPIView
 from django.http import FileResponse, JsonResponse
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import UserRateThrottle
-from django.db.models import Q, BooleanField, Case, Count, Prefetch, Exists, OuterRef, Value, When
+from django.db.models import Q,Prefetch, Exists, OuterRef
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.authentication import SessionAuthentication
 from rest_framework_simplejwt.views import TokenVerifyView, TokenObtainPairView, TokenRefreshView
@@ -24,28 +23,26 @@ from rest_framework.exceptions import ValidationError
 
 
 
-from api.permissions.core_permissions import IsTaskOwner, OwnerOrReadOnly
+from api.filters import SessionsFilter
+from api.selectors import visible_group
+from api.permissions.core_permissions import IsGroupOwner, IsTaskOwner, OwnerOrReadOnly
 from api.serializers.subtasks_serializers import CreateSubTaskSerializer
 from api.service.group_service import GroupService
 from api.service.token_service import JWTTokenService
-from main.utils.custom_api_errors import ForbiddenAccessSubTasks, NotFoundData, NotFoundProjectId, NotFoundRefreshToken, TaskNotFoundId
+from main.utils.custom_api_errors import ForbiddenAccessSubTasks, GroupNotFound, NotFoundData, NotFoundProjectId, NotFoundRefreshToken, TaskNotFoundId
 from api.serializers.stratagems_serializers import StratagemCreateSerializer, StratagemShortSerializer
 from common.cache_managers.project_cache import ProjectCacheManager
 from api.serializers.session_performer_serializer import SessionSerializerWithDate, TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
-from common.cache_managers.group_cache import GroupCacheManager
 from main import settings
-from api.utils import GroupLogger
 from common.mixins import CacheMixin
-from  main.settings import IS_ENABLE_CELERY
 from users.models import Group, GroupLogs, Notification, User
-from api.tasks import create_notify_user, create_notify_users
 from task.models import ActiveTask, Project, Stratagem, SubTask, Task, TaskComment, TaskImage, TaskPerformSession
 from .serializers.group_logs_serializers import GroupLogsSerializer
 from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer, TaskimageSerializer
-from .serializers.task_serializers import ActiveTaskSerializer, SubTaskSerializer, TaskCreateSerializer, TaskSerializer
+from .serializers.task_serializers import ActiveTaskSerializer, SubTaskSerializer, TaskSerializer
 from .serializers.user_serializers import CreateUserSerializer, UserPerformerSerializer, UserSerializer
-from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer, GroupCountProjectsSerializer
+from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator, PerformerSessionsPaginator
 from .serializers.project_serializers import (
     ProjectCreateSerializer, 
@@ -129,7 +126,7 @@ class UserProfileAPiView(APIView):
             return Response({"message": "Error"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserGroupApiView(CacheMixin, viewsets.ViewSet):
+class UserGroupApiView(viewsets.ViewSet):
     authentication_classes = [JWTAuthentication, SessionAuthentication]
     permission_classes = [OwnerOrReadOnly, IsAuthenticated]
     
@@ -141,7 +138,6 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
             request=request,
             filter_projects=filter_projects,
             user=user,
-            cache_mixin=self.set_get_cache
         )
 
         return result
@@ -149,15 +145,10 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
     def retrieve(self, request, pk=None, *args, **kwargs):
         user = request.user
 
-        cache_data = self.get_cache(f"group_{pk}_user_{user.id}")
-            
-        if cache_data:
-            return Response({"results": cache_data}, status=status.HTTP_200_OK)
 
         result = GroupService.get_group(
             request,
             user,
-            self.set_cache,
             pk
         )  
 
@@ -174,7 +165,7 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
         return result
     
 
-    def delete(self, request, pk=None, *args, **kwargs):
+    def destroy(self, request, pk=None, *args, **kwargs):
         group = get_object_or_404(Group.objects.select_related('owner'), id=pk)
 
         self.check_object_permissions(request, group)
@@ -208,137 +199,95 @@ class UserGroupApiView(CacheMixin, viewsets.ViewSet):
       
             
 
-class GroupProjectViewSet(CacheMixin,viewsets.ViewSet):
+class GroupProjectViewSet(viewsets.GenericViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def get_object(self):
-        obj = get_object_or_404(Project.objects.select_related("group"), pk=self.kwargs.get('pk', None))
-        return obj
+    def get_queryset(self):
+        return self.visible_projects(self.request.user).select_related('group')
+
+    def visible_projects(self, user):
+        is_member = Group.members.through.objects.filter(
+            group_id=OuterRef('group_id'), user_id=user.id
+        )
+        return Project.objects.filter(Exists(is_member) | Q(group__owner=user))
+
+    def get_permissions(self):
+        if self.action in ('partial_update', 'destroy'):
+            return [IsAuthenticated(), IsGroupOwner()]
+        return super().get_permissions()
+
+    def get_serializer_class(self):
+        return {
+            "create": ProjectCreateSerializer,
+            "partial_update": ProjectSerializer,
+            "retrieve": ProjectWithTasksSerializer,
+            "list": GroupSerializer,
+            "get_group_projects": ProjectWithTasksSerializer
+        }.get(self.action, ProjectSerializer)
 
     def list(self, request, *args, **kwargs):
-        user = self.request.user
-        
-        cache_data = self.get_cache(f"projects_list_{user.id}")
-
-        if cache_data:
-            return Response({"result": cache_data}, status=status.HTTP_200_OK)
 
         queryset = request.user.user_groups.prefetch_related(
             Prefetch(
                 "projects",
-                queryset=Project.objects.all().select_related("group"),
+                queryset=Project.objects.all(),
                 to_attr="group_projects"
             )
         ).all()
 
-
         serializer = GroupSerializer(queryset, many=True, context={"include_projects": True})
+        print(serializer.data)
 
-        self.set_cache(serializer.data, f'projects_list_{user.id}')
-
-        return Response({"result": serializer.data}, status=status.HTTP_200_OK)
-
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        serializer = ProjectCreateSerializer(data=data)
+        serializer = self.get_serializer(data=data)
 
-        GroupCacheManager.clean_group_list_cache(
-            filters=['A-z', 'Z-a', 'created', ''],
-            user_id=request.user.id
-        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
-        ProjectCacheManager.clear_all_cache(user_id=request.user.id
-)
-
-        if serializer.is_valid():
-            serializer.save()
-
-            return Response({'message': serializer.data}, status=status.HTTP_201_CREATED)
-        else:
-            return Response({'message': 'error', "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': serializer.data}, status=status.HTTP_201_CREATED)
         
     @action(methods=['get'], detail=True)
     def get_group_projects(self, request, pk=None, *args, **kwargs):
-        if pk is None:
-            return Response({'results': 'Without group Id'}, status=status.HTTP_404_NOT_FOUND)
+        visible_group
         
-        group =  Group.objects.select_related('owner').prefetch_related('members', 'projects').get(id=pk)
-
-        if not group:
-            return Response({'results': 'Not found group'}, status=status.HTTP_404_NOT_FOUND)
+        group =  visible_group(user=request.user).prefetch_related('members').get(id=pk)
         
-        user = request.user
-
-        if user not in group.members.all() or user != group.owner:
-            return Response({'results': 'access denied'}, status=status.HTTP_403_FORBIDDEN)
-        
-        projects = group.projects.all()
-
-        serializer = ProjectWithoutTasksSerializer(projects, many=True)
-
-        return Response({'results': serializer.data}, status=status.HTTP_200_OK)
-
-
-    def retrieve(self, request, pk=None, *args, **kwargs):
-        if pk:
-            obj = Project.objects.select_related(
-                'group'
-            ).prefetch_related(
-                Prefetch(
-                    'tasks',
-                    queryset=Task.objects.all().annotate(
-                        is_performer=Exists(
-                            User.objects.filter(
-                                pk=request.user.pk,
-                                assigned_tasks=OuterRef("pk"),
-                            )
-                        )
-                    ),
-                    to_attr='project_tasks'
-                )
-            ).get(pk=pk)
-
-
-            if not obj:
-                return Response({'message': '404'}, status=status.HTTP_404_NOT_FOUND)
-            
-            if obj.group and obj.group.id in request.user.user_groups.all():
-                return Response({'message': "403"}, status=status.HTTP_403_FORBIDDEN)
-            
-            serializer = ProjectWithTasksSerializer(obj)
-
-            print(serializer.data)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
-        
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-
-        serializer = ProjectSerializer(
-            instance,
-            data=request.data,
-            partial=True,
+        projects = group.projects.all().prefetch_related(
+            Prefetch(
+                'tasks',
+                queryset=Task.objects.all(),
+                to_attr="project_tasks"
+            )
         )
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response(
-                {"message":"Project partially updated!", 'result': serializer.data},
-                status=status.HTTP_200_OK
-            )
+        return Response({'results': self.get_serializer(projects, many=True).data}, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None, *args, **kwargs):
+        project = self.get_object()
+        tasks = project.tasks.annotate(is_performer=Exists(
+            Task.performers.through.objects.filter(task_id=OuterRef('pk'), user_id=request.user.id)
+        ))
+        project.project_tasks = list(tasks)
+        return Response({"results": self.get_serializer(project).data}, status=status.HTTP_200_OK)
         
-        return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    def partial_update(self, request, *args, **kwargs):
+        serializer = self.get_serializer(self.get_object(), data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 
-    def delete(self, request, pk=None, *args, **kwargs):
-        if pk:
-            try: 
-                project = Project.objects.get(id=pk)
-            except Project.DoesNotExist as e:
-                return Response({'message': 'error delete project'}, status=status.HTTP_400_BAD_REQUEST)
-            project.delete()
+    def destroy(self, request, pk=None, *args, **kwargs):
+        try: 
+            project = Project.objects.get(id=pk)
+        except Project.DoesNotExist as e:
+            return Response({'message': 'error delete project'}, status=status.HTTP_400_BAD_REQUEST)
+        project.delete()
 
-            return Response({"message": "success delete project"}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"message": "success delete project"}, status=status.HTTP_204_NO_CONTENT)
 
 
 class TaskViewSet(viewsets.GenericViewSet):
@@ -350,8 +299,8 @@ class TaskViewSet(viewsets.GenericViewSet):
         user = self.request.user
         qs = (
             Task.objects
-            .filter(project__group__members=user)
-            .select_related('owner', 'project')
+            .filter(project__group__members=user) 
+            .select_related('created_by', 'project')
             .annotate(is_active=Exists(
                 ActiveTask.objects.filter(task=OuterRef('pk'), user=user)
             ))
@@ -425,14 +374,14 @@ class TaskViewSet(viewsets.GenericViewSet):
         serializer = ActiveTaskSerializer(tasks, many=True)
         return Response({ 'results': serializer.data}, status=status.HTTP_200_OK)
     
-    @action(methods=['get', 'put', 'delete'], detail=True)
-    def active(self, request, pk=None):
+    @action(methods=['get', 'post', 'delete'], detail=True)
+    def active_task(self, request, pk=None, *args, **kwargs):
         task = self.get_object()
 
         if request.method == "GET":
-            active_task = ActiveTask.objects.filter(task=task).exists()
-            return Response({'results': active_task}, status=status.HTTP_200_OK)
-        elif request.method == 'PUT':
+            result = ActiveTask.objects.filter(user=request.user, task=task).exists()
+            return Response({'results': result}, status=status.HTTP_200_OK)
+        elif request.method == 'POST':
             ActiveTask.objects.get_or_create(user=request.user, task=task)
             return Response(status=status.HTTP_204_NO_CONTENT)
         elif request.method == 'DELETE':
@@ -474,14 +423,13 @@ class SubTaskViewSet(viewsets.ViewSet):
         task = Task.objects.get(id=task_id)
         last_subtask = task.subtasks.order_by("-id").first()
 
-
         serializer = CreateSubTaskSerializer(data=data, context={'position': last_subtask.id + 1})
         if serializer.is_valid():
             serializer.save()
             return Response({'results': serializer.data}, status=status.HTTP_201_CREATED)
         else:
             print(serializer.errors)
-            raise ValidationError
+            raise ValidationError(serializer.errors)
 
     def partial_update(self, request, pk, *args, **kwargs):
         instance = SubTask.objects.get(pk=pk)
@@ -559,11 +507,9 @@ class NotificationViewSet(CacheMixin, viewsets.ViewSet):
 
         query = Notification.objects.select_related('user').filter(user=request.user).order_by('-created_at')
 
-        notifications = self.set_get_cache(query, f'notifications_user_{user}', 60)
-
         paginator = NotificationPaginator()
 
-        result = paginator.paginate_queryset(notifications, request)
+        result = paginator.paginate_queryset(query, request)
 
         if result:
             serializer = NotificationSerializer(result, many=True)
@@ -815,50 +761,57 @@ class TaskPerformersViewSets(viewsets.ViewSet):
         return Response({ 'results': created}, status=status.HTTP_200_OK)
     
 
-class TaskSessionViewSets(viewsets.ViewSet):
+class TaskSessionViewSets(viewsets.GenericViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes  = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    pagination_class = PerformerSessionsPaginator
+    filterset_class = SessionsFilter
 
+    def check_permission_task(task_id, user):
+        qs = Task.performers.through.objects.filter(
+            task_id=task_id, user_id=user.id
+        ).exists()
+
+        if not qs:
+            raise 
+
+    def visible_queryset(self):
+        match (self.action):
+            case "get_sessions":
+                qs = Task.objects.filter(
+                    created_by=self.request.user
+                )
+                return qs
+            case _:
+                qs = Task.performers.through.objects.filter(
+                    task_id=OuterRef('task_id'), user_id=self.request.user.id
+                )
+                return qs
+
+    def get_queryset(self):
+        return TaskPerformSession.objects.filter(task__in=self.visible_queryset())
 
     @action(methods=['get'], detail=True)
-    def get_task_performers_sessions(self, request, pk=None, *args, **kwargs):
-        data = request.GET
-        is_active = data.get('is_active', None)
-        user_filter = data.get('user_filter', None)
-        show_unactive = data.get('unactive', None)
-        page = data.get('page', None)
+    def get_sessions(self, request, pk=None, *args, **kwargs):
+        qs = self.filter_queryset(
+            self.get_queryset().filter(task_id=pk)
+            .select_related("performer")
+            .order_by("is_active",'-created_at')
+        )
+        
+        result = self.paginate_queryset(qs)
 
-        if page and int(page) < 1 and type(page) != int: 
-            return Response({ "results": ["page not found"]}, status=status.HTTP_404_NOT_FOUND)
-
-        sessions_query = TaskPerformSession.objects.select_related('task', 'performer').filter(task__id=pk).order_by('-created_at')
-        if is_active is not None:
-            sessions_query = sessions_query.filter(is_active=True)
-
-        if user_filter is not None:
-            sessions_query = sessions_query.filter(performer__username__icontains=user_filter)
-
-        if show_unactive is not None:
-            sessions_query = sessions_query.filter(is_active=False)
-
-        paginator = PerformerSessionsPaginator()
-        result = paginator.paginate_queryset(sessions_query, request)
-
-        if result:
-            serializer = TaskPerformSessionWithUsersSerializer(result, many=True)
-            return paginator.get_paginated_response(serializer.data)
-            # return Response({ 'results': serializer.data}, status=status.HTTP_200_OK)
-        else:
-            return Response({ 'results': []}, status=status.HTTP_200_OK)
+        serializer = TaskPerformSessionWithUsersSerializer(result, many=True)
+        return self.get_paginated_response(serializer.data)
+        
 
     @action(methods=['post'], detail=False)
-    def start_session_performer(self, request, *args, **kwargs):
+    def start(self, request, *args, **kwargs):
         data = request.data
 
         user_id = request.user.id
         task_id = data.get('taskId', None)
-
-        print(task_id)
 
         try:
             created = TaskPerformSession.objects.create(
@@ -874,7 +827,7 @@ class TaskSessionViewSets(viewsets.ViewSet):
         return Response({ 'results': {'id': created.id}}, status=status.HTTP_200_OK)
     
     @action(methods=['patch'], detail=True)
-    def update_session_performer(self, request, pk=None, *args, **kwargs):
+    def update_session(self, request, pk=None, *args, **kwargs):
         task_session = get_object_or_404(TaskPerformSession, id=pk)
 
         session_time = request.data.get('time', None)
@@ -902,7 +855,7 @@ class TaskSessionViewSets(viewsets.ViewSet):
         return Response({ 'results': 'Session updated!'}, status=status.HTTP_200_OK)
     
     @action(methods=['post'], detail=True)
-    def end_session(self, request, pk=None, *args, **kwargs):
+    def end(self, request, pk=None, *args, **kwargs):
         task_session = get_object_or_404(TaskPerformSession, id=pk)
 
         time = request.data.get('time', None)

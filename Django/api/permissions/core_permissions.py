@@ -20,3 +20,8 @@ class OwnerOrReadOnly(BasePermission):
             return True
         
         return bool(obj.owner == request.user)
+
+
+class IsGroupOwner(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return obj.group.owner_id == request.user.id

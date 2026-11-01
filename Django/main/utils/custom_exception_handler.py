@@ -15,6 +15,7 @@ from main.utils.custom_api_errors import (
     NotFoundToken,
     NotFoundRefreshToken,
     UserAlreadyExistInGroup,
+    PermissionDenied,
 
     #User
     UserNotFound,
@@ -52,6 +53,10 @@ def custom_exception_handler(exc, context):
     # SubTask
     if isinstance(exc, ForbiddenAccessSubTasks):
         return Response({'detail': str(exc)}, status=ForbiddenAccessSubTasks.status_code)
+
+    # TaskSessions
+    if isinstance(exc, PermissionDenied):
+        return Response({'detail': str(exc)}, status=PermissionDenied.status_code)
 
     # Group
     if isinstance(exc, GroupNotFound):

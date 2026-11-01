@@ -92,3 +92,9 @@ class NotFoundProjectId(APIException):
     status_code = 404
     default_detail = "Not found project"
     default_code = "error"
+
+# TaskSessions
+class PermissionDenied(APIException):
+    status_code = 403
+    default_detail = "Permission denied"
+    default_code = "error"
