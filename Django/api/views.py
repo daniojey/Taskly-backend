@@ -3,6 +3,7 @@ from asgiref.sync import async_to_sync
 from decouple import config
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from django.utils.timezone import timedelta
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
@@ -24,12 +25,12 @@ from rest_framework.exceptions import ValidationError
 
 
 from api.filters import SessionsFilter
-from api.selectors import visible_group
+from api.selectors import visible_group, visible_task
 from api.permissions.core_permissions import IsGroupOwner, IsTaskOwner, OwnerOrReadOnly
 from api.serializers.subtasks_serializers import CreateSubTaskSerializer
 from api.service.group_service import GroupService
 from api.service.token_service import JWTTokenService
-from main.utils.custom_api_errors import ForbiddenAccessSubTasks, GroupNotFound, NotFoundData, NotFoundProjectId, NotFoundRefreshToken, TaskNotFoundId
+from main.utils.custom_api_errors import ForbiddenAccessSubTasks, GroupNotFound, NotFoundData, NotFoundProjectId, NotFoundRefreshToken, NotFoundSession, TaskNotFoundId
 from api.serializers.stratagems_serializers import StratagemCreateSerializer, StratagemShortSerializer
 from common.cache_managers.project_cache import ProjectCacheManager
 from api.serializers.session_performer_serializer import SessionSerializerWithDate, TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
@@ -40,7 +41,7 @@ from task.models import ActiveTask, Project, Stratagem, SubTask, Task, TaskComme
 from .serializers.group_logs_serializers import GroupLogsSerializer
 from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer, TaskimageSerializer
-from .serializers.task_serializers import ActiveTaskSerializer, SubTaskSerializer, TaskSerializer
+from .serializers.task_serializers import ActiveTaskSerializer, SessionTimeSerializer, StartSessionSerializer, SubTaskSerializer, TaskSerializer
 from .serializers.user_serializers import CreateUserSerializer, UserPerformerSerializer, UserSerializer
 from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator, PerformerSessionsPaginator
@@ -808,77 +809,50 @@ class TaskSessionViewSets(viewsets.GenericViewSet):
 
     @action(methods=['post'], detail=False)
     def start(self, request, *args, **kwargs):
-        data = request.data
+        r = StartSessionSerializer(data=request.data)
+        r.is_valid(raise_exception=True)
 
-        user_id = request.user.id
-        task_id = data.get('taskId', None)
+        task = get_object_or_404(
+            visible_task(
+                request.user, 
+                task_id=r.validated_data
+            ).first()
+        )
 
-        try:
-            created = TaskPerformSession.objects.create(
-                performer_id=user_id,
-                task_id=task_id,
-                duration=timedelta(0, 0, 0, 0, 0, 0),
-                is_active=True,
-            )
-        except Exception as e:
-            print(e)
-            return Response({ 'results': 'Error create session'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response({ 'results': {'id': created.id}}, status=status.HTTP_200_OK)
+        session, created = TaskPerformSession.objects.get_or_create(
+            performer=request.user, task=task, is_active=True,
+        )
+        return Response({'results': session.id}, 
+                        status=status.HTTP_204_NO_CONTENT if created else status.HTTP_200_OK)
     
     @action(methods=['patch'], detail=True)
     def update_session(self, request, pk=None, *args, **kwargs):
-        task_session = get_object_or_404(TaskPerformSession, id=pk)
-
-        session_time = request.data.get('time', None)
-
-        if not session_time:
-            return Response({'results': 'Updated session error'}, status=status.HTTP_200_OK)
-
-        if not task_session:
-            return Response({'results': 'Not found task session'}, status=status.HTTP_404_NOT_FOUND)
-
-        total_seconds = session_time // 1000
-    
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60
-
-        task_session.duration = timedelta(
-            hours=hours,
-            minutes=minutes,
-            seconds=seconds
-        )
-
-        task_session.save(update_fields=['duration', 'updated_at'])
-
-        return Response({ 'results': 'Session updated!'}, status=status.HTTP_200_OK)
+        return self._write(request, pk, finish=False)
     
     @action(methods=['post'], detail=True)
     def end(self, request, pk=None, *args, **kwargs):
-        task_session = get_object_or_404(TaskPerformSession, id=pk)
+        return self._write(request, pk, finish=True)
 
-        time = request.data.get('time', None)
+    def _write(self, request, pk,* , finish):
+        s = SessionTimeSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
 
-        if not task_session or not time:
-            return Response({'results': ''}, status=status.HTTP_400_BAD_REQUEST)
-        
-        total_seconds = time // 1000
-        
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60
+        fields = {
+            "duration": timedelta(milliseconds=s.validated_data['time']),
+            "updated_at": timezone.now() 
+        }
 
-        task_session.duration = timedelta(
-            hours=hours,
-            minutes=minutes,
-            seconds=seconds
-        )
-        task_session.is_active = False
-        task_session.save()
-        
-        return Response({'results': ''}, status=status.HTTP_200_OK)
-    
+        if finish:
+            fields['is_active'] = False
+
+        updated = TaskPerformSession.objects.filter(
+            pk=pk, performer=request.user, is_active=True
+        ).update(**fields)
+
+        if not updated:
+            raise NotFoundSession()
+        return Response({'results': updated}, status=status.HTTP_204_NO_CONTENT)
+
 
 class TaskStatisticsViewSets(viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]

@@ -94,3 +94,11 @@ class SubTaskSerializer(serializers.ModelSerializer):
             'created_at',
             "is_closed"
         ]
+
+
+class StartSessionSerializer(serializers.Serializer):
+    task_id = serializers.CharField(required=True, min_length=1)
+
+
+class SessionTimeSerializer(serializers.Serializer):
+    time = serializers.IntegerField(min_value=0)

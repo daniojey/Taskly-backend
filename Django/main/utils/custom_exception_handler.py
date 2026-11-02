@@ -10,6 +10,7 @@ from main.utils.custom_api_errors import (
     NotFoundData,
     NotFoundNotifyData,
     NotFoundProjectId,
+    NotFoundSession,
     NotFoundValueInData,
     UncorrectToken,
     NotFoundToken,
@@ -57,6 +58,8 @@ def custom_exception_handler(exc, context):
     # TaskSessions
     if isinstance(exc, PermissionDenied):
         return Response({'detail': str(exc)}, status=PermissionDenied.status_code)
+    if isinstance(exc, NotFoundSession):
+        return Response({'detail': str(exc)}, status=NotFoundSession.status_code)
 
     # Group
     if isinstance(exc, GroupNotFound):

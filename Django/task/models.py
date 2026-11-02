@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 
 
 class Project(models.Model):
@@ -98,6 +99,15 @@ class TaskPerformSession(models.Model):
 
     def __str__(self):
         return f"performer:{self.performer.username} , task:{self.task.name}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['performer', 'task'],
+                condition=Q(is_active=True),
+                name="one_active_session_per_user_task"
+            )
+        ]
     
 
 class TaskComment(models.Model):
