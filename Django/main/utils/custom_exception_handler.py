@@ -11,7 +11,9 @@ from main.utils.custom_api_errors import (
     NotFoundNotifyData,
     NotFoundProjectId,
     NotFoundSession,
+    NotFoundStratagem,
     NotFoundValueInData,
+    StratagemForbidden,
     UncorrectToken,
     NotFoundToken,
     NotFoundRefreshToken,
@@ -72,6 +74,12 @@ def custom_exception_handler(exc, context):
     # User
     if isinstance(exc, UserNotFound):
         return Response({'detail': str(exc)}, status=UserNotFound.status_code)
+
+    # Stratagems 
+    if isinstance(exc, NotFoundStratagem):
+        return Response({'detail': str(exc)}, status=NotFoundStratagem.status_code)
+    if isinstance(exc, StratagemForbidden):
+        return Response({'detail': str(exc)}, status=StratagemForbidden.status_code)
 
     # Notification
     if isinstance(exc, NotFoundNotifyData):

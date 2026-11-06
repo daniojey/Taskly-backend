@@ -103,3 +103,15 @@ class NotFoundSession(APIException):
     status_code = 404
     default_detail = "Not found session"
     default_code = "error"
+
+
+# Stratagems
+class NotFoundStratagem(APIException):
+    status_code = 404
+    default_detail = "Not found stratagem"
+    default_code = "error"
+
+class StratagemForbidden(APIException):
+    status_code = 403
+    default_detail = "Forbidden access"
+    default_code = "error"

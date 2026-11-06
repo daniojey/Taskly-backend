@@ -24,6 +24,7 @@ from rest_framework.exceptions import ValidationError
 
 
 
+from api.permissions.stratagem_permission import IsStratagemOwner
 from api.filters import SessionsFilter
 from api.selectors import visible_group, visible_task
 from api.permissions.core_permissions import IsGroupOwner, IsTaskOwner, OwnerOrReadOnly
@@ -49,7 +50,6 @@ from .serializers.project_serializers import (
     ProjectCreateSerializer, 
     ProjectSerializer, 
     ProjectWithTasksSerializer, 
-    ProjectWithoutTasksSerializer
 )
 from api.service.task_service import TaskService
 
@@ -85,12 +85,15 @@ class CustomTokenRefreshView(TokenRefreshView):
 
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get('refresh')
+        print(refresh_token)
 
         if not refresh_token:
             raise NotFoundRefreshToken()
         
         data = request.data.copy()
         data['refresh'] = refresh_token
+
+        print(data)
         
         request._full_data = data
         
@@ -687,10 +690,6 @@ class TaskPerformersViewSets(viewsets.ViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes  = [IsAuthenticated]
 
-    def retrieve(self, request, pk=None, *args, **kwargs):
-        data = []
-
-        return Response({ 'results': data}, status=status.HTTP_200_OK)
     
     @action(methods=['get'], detail=True)
     def group_performers(self, request, pk=None, *args, **kwargs):
@@ -816,7 +815,7 @@ class TaskSessionViewSets(viewsets.GenericViewSet):
             visible_task(
                 request.user, 
                 task_id=r.validated_data
-            ).first()
+            )
         )
 
         session, created = TaskPerformSession.objects.get_or_create(
@@ -854,44 +853,39 @@ class TaskSessionViewSets(viewsets.GenericViewSet):
         return Response({'results': updated}, status=status.HTTP_204_NO_CONTENT)
 
 
-class TaskStatisticsViewSets(viewsets.ViewSet):
+class TaskStatisticsViewSets(viewsets.GenericViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
+
+    def get_queryset(self):
+        return TaskPerformSession.objects.select_related(
+            "performer"
+        ).filter(
+            task__created_by_id=self.request.user.id
+        )
+
     def retrieve(self, request, pk=None, *args, **kwargs):
-        task = Task.objects.filter(id=pk).exists()
+        s = self.get_queryset().filter(task_id=pk)
 
-        if not task:
-            return Response({'results': 'Not found task'}, status=status.HTTP_404_NOT_FOUND)
-
-        task = Task.objects.prefetch_related(
-            Prefetch(
-                'performs_sessions',
-                queryset=TaskPerformSession.objects.all().order_by('-created_at'),
-                to_attr='performers_sessions'
-            )
-        ).get(id=pk)
-
-        serializer = SessionSerializerWithDate(task.performers_sessions, many=True)
+        serializer = SessionSerializerWithDate(s, many=True)
 
         return Response({'results': serializer.data}, status=status.HTTP_200_OK)
 
 
-class StratagemViewSets(viewsets.ViewSet):
+class StratagemViewSets(viewsets.GenericViewSet):
     authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsStratagemOwner]
 
     def get_queryset(self):
-        return Stratagem.objects.select_related('user').all()
+        return Stratagem.objects.select_related('user').filter(user=self.request.user)
     
     def list(self, request, *args, **kwargs):
-        user = request.user
-        stratagems = self.get_queryset().filter(user__id=user.id)
+        stratagems = self.get_queryset()
 
         serializer = StratagemShortSerializer(stratagems, many=True)
 
         return Response({'results': serializer.data}, status=status.HTTP_200_OK)
-    
 
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -899,40 +893,21 @@ class StratagemViewSets(viewsets.ViewSet):
 
         serializer = StratagemCreateSerializer(data=data)
 
-        if serializer.is_valid():
-            created = serializer.save()
-            serializer_obj = StratagemShortSerializer(created)
-            return Response({'results': serializer_obj.data}, status=status.HTTP_200_OK)
-        else:
-            return Response({'results': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+
+        return Response({'results': serializer.data})
 
     def partial_update(self, request, pk=None, *args, **kwargs):
-        print(pk)
-        try:
-            stratagem = Stratagem.objects.select_related('user').get(id=pk)
-        except Stratagem.DoesNotExist:
-            return Response({'results': 'Not found stratagem item'}, status=status.HTTP_404_NOT_FOUND)
-        
-        if stratagem.user.id != request.user.id:
-            return Response({'results': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
+        stratagem = self.get_object()
         
         serializer = StratagemShortSerializer(stratagem, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
 
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
-        else:
-            return Response({'results': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response({'results': serializer.data}, status=status.HTTP_200_OK)
 
     def delete(self, request, pk=None, *args, **kwargs):
-        try:
-            stratagem = Stratagem.objects.select_related('user').get(id=pk)
-        except Stratagem.DoesNotExist:
-            return Response({'results': 'Stratagem not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        if stratagem.user.id != request.user.id:
-            return Response({'results': 'Forbidden'}, status=status.HTTP_403_FORBIDDEN)
-        
+        stratagem = self.get_object()
         stratagem.delete()
 
         return Response({'results': 'Delete success'}, status=status.HTTP_204_NO_CONTENT)

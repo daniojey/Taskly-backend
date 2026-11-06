@@ -15,8 +15,6 @@ class StratagemCreateSerializer(serializers.ModelSerializer):
         new_data = copy.deepcopy(data)
         action = data['action']
 
-        print(action)
-
         validate_map = {
             'group': Stratagem.OPEN_GROUP,
             'project': Stratagem.OPEN_PROJECT,
