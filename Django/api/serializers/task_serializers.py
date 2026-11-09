@@ -99,6 +99,10 @@ class SubTaskSerializer(serializers.ModelSerializer):
 class StartSessionSerializer(serializers.Serializer):
     task_id = serializers.CharField(required=True, min_length=1)
 
+    def validate_task_id(self, task_id):
+        task_id = int(task_id)
+        return task_id
+
 
 class SessionTimeSerializer(serializers.Serializer):
     time = serializers.IntegerField(min_value=0)

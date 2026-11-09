@@ -877,6 +877,13 @@ class StratagemViewSets(viewsets.GenericViewSet):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated, IsStratagemOwner]
 
+    def get_serializer_class(self):
+        match (self.action):
+            case "create":
+                return StratagemCreateSerializer
+            case "partial_update":
+                return StratagemShortSerializer
+
     def get_queryset(self):
         return Stratagem.objects.select_related('user').filter(user=self.request.user)
     
@@ -891,7 +898,7 @@ class StratagemViewSets(viewsets.GenericViewSet):
         data = request.data
         data['user'] = request.user.id
 
-        serializer = StratagemCreateSerializer(data=data)
+        serializer = self.get_serializer_class(data=data)
 
         serializer.is_valid(raise_exception=True)
 
@@ -900,7 +907,7 @@ class StratagemViewSets(viewsets.GenericViewSet):
     def partial_update(self, request, pk=None, *args, **kwargs):
         stratagem = self.get_object()
         
-        serializer = StratagemShortSerializer(stratagem, data=request.data, partial=True)
+        serializer = self.get_serializer_class(stratagem, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
         serializer.save()

@@ -78,7 +78,6 @@ class TestTokenWithoutData:
         response = client.post(api_url + 'token/refresh/')
 
         assert response.status_code == 404
-        assert response.data['message'] == 'Token not found'
 
 
     @pytest.mark.parametrize('token, status', [

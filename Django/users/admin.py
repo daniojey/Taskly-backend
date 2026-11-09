@@ -20,4 +20,4 @@ class GroupModelAdmin(admin.ModelAdmin):
 @admin.register(GroupLogs)
 class GroupLogsModelAdmin(admin.ModelAdmin):
     list_display = ['event_type', 'group', 'created_at' ]
-    list_select_related = True
+    list_select_related = ['group']
