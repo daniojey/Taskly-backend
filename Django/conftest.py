@@ -1,46 +1,50 @@
-
-
-from pytest import fixture
 import pytest
-from pytest_config import api_url
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
+from api.tests.factories.user_factory import (
+    GroupFactory,
+    UserFactory,
+)
 
-from users.models import User
+
+@pytest.fixture
+def user(db):
+    return UserFactory()
 
 
-def groups_count(parser):
-    parser.addoption(
-        "--groups-count",
-        action='store',
-        default=5,
-        type=int,
-        help="The number of groups that will be created"
+@pytest.fixture
+def user_password():
+    return "testpass123"
+
+
+@pytest.fixture
+def api_client():
+    return APIClient()
+
+
+@pytest.fixture
+def auth_api_client(api_client, user):
+
+    refresh = RefreshToken.for_user(user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+    return api_client
+
+
+@pytest.fixture
+def user_with_groups():
+    u = UserFactory()
+    g1, g2, g3 = GroupFactory.create_batch(
+        3, 
+        group="user", 
+        members=[user],
+        owner=u
     )
 
-@fixture(scope="function")
-def auth_data(request , django_db_setup, django_db_blocker):
-    username = request.param
-
-    with django_db_blocker.unblock():
-        user = User.objects.get(username=username)
-
-    from rest_framework_simplejwt.tokens import RefreshToken
-    token = RefreshToken.for_user(user)
-
-    return {
-        'token': str(token.access_token),
-        'user': user,
-        'username': user.username
-    }
+    return u
 
 
-@pytest.fixture(autouse=True, scope="session")
-def create_users(django_db_setup, django_db_blocker):
-    with django_db_blocker.unblock():
-        User.objects.create_user(username="base_user",  password="base_user123")
-        User.objects.create_user(username="owner_user", password="owner_user123", is_staff=True)
-        User.objects.create_user(username="admin_user", password="admin_user",    is_superuser=True)
-    
-    yield
-    
-    with django_db_blocker.unblock():
-        User.objects.all().delete()
+@pytest.fixture
+def group():
+    return GroupFactory()
+
+

@@ -4,9 +4,8 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from api.serializers.user_serializers import UserSerializer
 from users.models import User
-from main.utils.custom_api_errors import NotFoundRefreshToken, NotFoundToken, UserNotFound
+from main.utils.custom_api_errors import NotFoundToken, UserNotFound
 from rest_framework.response import Response
-from rest_framework.serializers import ReturnDict
 from rest_framework import status
 
 
@@ -56,10 +55,12 @@ class JWTTokenService:
 
     @staticmethod
     def token_pair(request, response):
+        user_id = AccessToken(response.data['access'])['user_id']
+
         new_response = Response({
             'access': response.data['access'],
             'user': {
-            'id': request.user.id if hasattr(request, 'user') else None,
+            'id': user_id,
             'username': request.data.get('username', None)
             }
         }, status=status.HTTP_200_OK)
