@@ -85,15 +85,12 @@ class CustomTokenRefreshView(TokenRefreshView):
 
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get('refresh')
-        print(refresh_token)
 
         if not refresh_token:
             raise NotFoundRefreshToken()
         
         data = request.data.copy()
         data['refresh'] = refresh_token
-
-        print(data)
         
         request._full_data = data
         
