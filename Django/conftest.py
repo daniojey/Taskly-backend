@@ -1,3 +1,4 @@
+from django.conf import settings
 import pytest
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -26,8 +27,12 @@ def api_client():
 def auth_api_client(api_client, user):
 
     refresh = RefreshToken.for_user(user)
+    api_client.cookies.load({
+        "refresh": str(refresh)
+    })
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return api_client
+
 
 
 @pytest.fixture

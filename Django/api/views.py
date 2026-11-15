@@ -66,7 +66,7 @@ def csrf(request, *args, **kwargs):
     response.set_cookie(
         'csrftoken',
         csrf_token,
-        max_age=3600,
+        max_age=settings.CSRF_TOEKN_MAX_AGE,
         secure=settings.CSRF_COOKIE_SECURE,
         samesite=settings.CSRF_COOKIE_SAMESITE,
     )

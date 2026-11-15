@@ -138,17 +138,8 @@ class TestCustomTokenRefresh:
     pair_url = reverse("api:token_obtain_pair", kwargs={"version": "v1"})
     refresh_url = reverse("api:token_refresh", kwargs={'version': 'v1'})
 
-    def test_refresh_token_url(self, api_client, user, user_password):
-        pair_data = {
-            'username': user.username,
-            'password': user_password
-        }
-
-        # We`re going to simulate get real token and refresh it `
-        r = api_client.post(self.pair_url, pair_data)
-        assert r.status_code == 200, r
-
-        old_token = r.cookies['refresh'].value
+    def test_refresh_token_url(self, api_client,auth_api_client):
+        old_token = auth_api_client.cookies['refresh'].value
 
         assert old_token
 
@@ -173,22 +164,10 @@ class TestCustomTokenRefresh:
     def test_hearing_of_exceptions(
         self, 
         api_client,
-        user,
-        user_password,
         token,
         status,
         ):
-        user_data = {
-            'username': user.username,
-            'password': user_password
-        }
-
-        # First step take valid refresh token
-        r = api_client.post(self.pair_url, user_data)
-
-        assert r.status_code == 200
-
-        r.cookies['refresh'] = token
+        api_client.cookies['refresh'] = token
 
         # with pytest.raises(error):
         response = api_client.post(self.refresh_url)
@@ -201,3 +180,24 @@ class TestCustomTokenRefresh:
         response = getattr(api_client, method)(self.refresh_url)
 
         assert response.status_code == 405
+
+
+class TestTokenLogout:
+    logout_url = reverse('api:token_logout', kwargs={'version': 'v1'})
+
+    def test_logout_correct(self, auth_api_client):
+        assert auth_api_client.cookies['refresh'].value
+        assert "HTTP_AUTHORIZATION" in auth_api_client._credentials, auth_api_client._credentials
+
+        response = auth_api_client.post(self.logout_url)
+
+        assert response.status_code == 200
+        assert response.data['results'] == "Logout success"
+
+        # Morsel should not find the token in the cookies 
+        with pytest.raises(AssertionError):
+            assert not response.cookies['refresh']
+
+        # After logout we can simulated logout in client side(just clear headers)
+        auth_api_client.credentials()
+        assert auth_api_client._credentials == {}
