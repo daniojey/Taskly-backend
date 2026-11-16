@@ -6,9 +6,22 @@ from users.models import Group, User
 
 
 class GroupCreateSerializer(serializers.ModelSerializer):
+    members = serializers.PrimaryKeyRelatedField(
+        many=True,
+        required=False,
+        queryset=User.objects.all()
+    )
+
     class Meta:
         model = Group
-        fields = '__all__'
+        fields = ['name','members']
+
+
+class GroupOneReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Group
+        fields = ['id', 'name', 'owner', 'created_at', 'updated_at', 'members']
+        
 
 
 class GroupSerializer(serializers.ModelSerializer):

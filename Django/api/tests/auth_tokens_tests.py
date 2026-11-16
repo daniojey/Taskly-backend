@@ -4,12 +4,13 @@ from django.urls import reverse
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from api.tests.utils.common import get_url
 from main.utils.custom_api_errors import NotFoundRefreshToken
 from api.serializers.user_serializers import UserSerializer
 
 @pytest.mark.django_db
 class TestCustomTokenVerify:
-    verify_url = reverse("api:token_verify", kwargs={"version": "v1"})
+    verify_url = get_url('api:token_verify')
 
     def test_verify_valid_token(self, api_client, user):
         refresh = RefreshToken.for_user(user)
@@ -54,7 +55,7 @@ class TestCustomTokenVerify:
 
 @pytest.mark.django_db
 class TestCustomTokenPair:
-    pair_url = reverse("api:token_obtain_pair", kwargs={"version": "v1"})
+    pair_url = get_url('api:token_obtain_pair')
     max_age = settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
     samesite = settings.CSRF_COOKIE_SAMESITE
     secure = settings.CSRF_COOKIE_SECURE
@@ -135,8 +136,8 @@ class TestCustomTokenPair:
 
 @pytest.mark.django_db
 class TestCustomTokenRefresh:
-    pair_url = reverse("api:token_obtain_pair", kwargs={"version": "v1"})
-    refresh_url = reverse("api:token_refresh", kwargs={'version': 'v1'})
+    pair_url = get_url('api:token_obtain_pair')
+    refresh_url = get_url('api:token_refresh')
 
     def test_refresh_token_url(self, api_client,auth_api_client):
         old_token = auth_api_client.cookies['refresh'].value
@@ -183,7 +184,7 @@ class TestCustomTokenRefresh:
 
 
 class TestTokenLogout:
-    logout_url = reverse('api:token_logout', kwargs={'version': 'v1'})
+    logout_url = get_url('api:token_logout')
 
     def test_logout_correct(self, auth_api_client):
         assert auth_api_client.cookies['refresh'].value

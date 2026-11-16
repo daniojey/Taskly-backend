@@ -192,8 +192,10 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Rest settings
+# For tets api:tests:utils
+DEFAULT_API_VERSION = 'v1'
 
+# Rest settings
 REST_FRAMEWORK = {
 
     'DEFAULT_AUTHENTICATION_CLASSES': (

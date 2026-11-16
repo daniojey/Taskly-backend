@@ -44,7 +44,7 @@ from .serializers.notification_serializers import NotificationSerializer
 from .serializers.task_chat_serializers import TaskChatMessageSerializer, TaskimageSerializer
 from .serializers.task_serializers import ActiveTaskSerializer, SessionTimeSerializer, StartSessionSerializer, SubTaskSerializer, TaskSerializer
 from .serializers.user_serializers import CreateUserSerializer, UserPerformerSerializer, UserSerializer
-from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupSerializer
+from .serializers.group_serializers import GroupCreateSerializer, GroupDetailSerializer, GroupOneReadSerializer, GroupSerializer
 from api.paginators import ChatMessagePaginator, GroupLogsPaginator, NotificationPaginator, PerformerSessionsPaginator
 from .serializers.project_serializers import (
     ProjectCreateSerializer, 
@@ -114,7 +114,7 @@ class CustomTokenVerifyView(TokenVerifyView):
 
         return JWTTokenService.check_token(token)
 
-
+# TODO don`t use now in project`
 class UserProfileAPiView(APIView):
 
     def get(self, request,  *args, **kwargs):
@@ -127,9 +127,14 @@ class UserProfileAPiView(APIView):
             return Response({"message": "Error"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class UserGroupApiView(viewsets.ViewSet):
+class UserGroupApiView(viewsets.GenericViewSet):
     authentication_classes = [JWTAuthentication, SessionAuthentication]
     permission_classes = [OwnerOrReadOnly, IsAuthenticated]
+
+    def get_serializer_class(self):
+        match (self.action):
+            case "create":
+                return GroupCreateSerializer
     
     def list(self, request, *args, **kwargs):
         filter_projects = request.GET.get('f', '')
@@ -156,15 +161,19 @@ class UserGroupApiView(viewsets.ViewSet):
         return result
         
     def create(self, request, *args, **kwargs):
-        group_data = request.data
+        group_limit = Group.objects.filter(owner__id=request.user.id).count()
+        
+        if group_limit >= 8:
+            return Response({'results': 'The limit for creating groups has been reached'}, status=status.HTTP_403_FORBIDDEN)
 
-        result = GroupService.group_create(
-            request,
-            group_data
-        )
+        serializer = self.get_serializer(data=request.data) 
+        serializer.is_valid(raise_exception=True)
 
-        return result
-    
+        group = serializer.save(owner=request.user)
+        group.members.add(request.user)
+
+        return Response({"results": GroupOneReadSerializer(group).data}, status=status.HTTP_201_CREATED)
+
 
     def destroy(self, request, pk=None, *args, **kwargs):
         group = get_object_or_404(Group.objects.select_related('owner'), id=pk)

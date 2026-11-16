@@ -2,8 +2,8 @@ from django.conf import settings
 import pytest
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from api.tests.factories.group_factory import GroupFactory
 from api.tests.factories.user_factory import (
-    GroupFactory,
     UserFactory,
 )
 
@@ -11,6 +11,10 @@ from api.tests.factories.user_factory import (
 @pytest.fixture
 def user(db):
     return UserFactory()
+
+@pytest.fixture
+def users():
+    return UserFactory
 
 
 @pytest.fixture
@@ -50,6 +54,6 @@ def user_with_groups():
 
 @pytest.fixture
 def group():
-    return GroupFactory()
+    return GroupFactory
 
 

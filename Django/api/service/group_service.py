@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import BooleanField, Case, Count, Prefetch, Value, When
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -86,22 +87,15 @@ class GroupService:
         except Group.DoesNotExist:
             raise GroupNotFound
 
-    @staticmethod
-    def group_create(request, group_data):
+    # @staticmethod
+    # @transaction.atomic
+    # def group_create(request, group_data):
+    #     serializer = GroupCreateSerializer(data=group_data)
 
-        group_limit = Group.objects.filter(owner__id=request.user.id).count()
+    #     serializer.is_valid(raise_exception=True)       
+    #     serializer.save(owner=request.user)
 
-        if group_limit >= 8:
-            return Response({'results': 'The limit for creating groups has been reached'}, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = GroupCreateSerializer(data=group_data)
-
-        if serializer.is_valid():
-            serializer.save()
-
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-        else:
-            return Response({"result": "not valid data", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    #     return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
 
 
     @staticmethod
