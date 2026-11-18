@@ -1,3 +1,5 @@
+from django.utils import timezone
+from django.utils.timezone import timedelta
 import pytest
 
 from api.tests.utils.common import get_url
@@ -14,7 +16,6 @@ class TestGroupCreate:
     def test_created_group(self, auth_api_client, user, users, members_count):
         users = users.create_batch(members_count)
         users_ids = [int(u.id) for u in users]
-        print(users_ids)
 
         group_data = {
             'name': 'TestGroupName',
@@ -65,3 +66,103 @@ class TestGroupCreate:
         response = api_client.post(self.create_url, group_data, format='json')
 
         assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestListGroup:
+    url_string = 'api:groups-list'
+    list_url = get_url('api:groups-list')
+
+    @pytest.mark.parametrize('groups_count, members_count', [
+        pytest.param(0, 0),
+        pytest.param(4, 0),
+        pytest.param(5, 5),
+        pytest.param(10, 3),
+    ])
+    def test_get_group_list(
+        self, 
+        auth_api_client, 
+        groups, 
+        user,
+        users,
+        groups_count,
+        members_count,
+    ):
+        users = users.create_batch(members_count)
+
+        if members_count > 0:
+            groups.create_batch(groups_count, members=(*users,), owner=user)
+        else:
+            groups.create_batch(groups_count, owner=user)
+
+        response = auth_api_client.get(self.list_url)
+
+        assert response.status_code == 200, response.data
+
+        data = response.data['results']
+        assert len(data) == groups_count, response
+
+        members_and_owner = members_count + 1
+        for g in data:
+            assert g['count_members'] == members_and_owner, g['count_members']
+
+    @pytest.mark.parametrize('groups_count', [0, 1, 3])
+    def test_get_list_not_member(self,auth_api_client, groups, groups_count):
+        groups.create_batch(groups_count)
+
+        response = auth_api_client.get(self.list_url)
+
+        assert response.status_code, response
+        assert len(response.data['results']) == 0
+
+    def test_not_auth_user(self, api_client):
+        response = api_client.get(self.list_url)
+
+        assert response.status_code == 401
+
+        
+    @pytest.mark.parametrize('filter_name, g_string, group_param', [
+        pytest.param('Name', 'A-z', 'Agroup', id="filter group name"),
+        pytest.param('Name reverse', 'Z-a', 'Zgroup', id="filter group name reverse"),
+        pytest.param('Created_date', 'created', timezone.now() + timedelta(days=1), id="filter date created"),
+        pytest.param('Created_date reverse', '', timezone.now() - timedelta(days=1))
+    ])
+    def test_filter_list(
+        self, 
+        auth_api_client, 
+        user, 
+        users, 
+        groups,
+        filter_name,
+        g_string,
+        group_param
+    ):
+        users = users.create_batch(2)
+        groups.create_batch(5, members=(*users,), owner=user)
+
+        match (filter_name):
+            case 'Name':
+                g = groups.create(name=group_param, owner=user)
+            case 'Name reverse':
+                g = groups.create(name=group_param, owner=user)
+            case 'Created_date':
+                g = groups.create(created_at=group_param, owner=user)
+            case 'Created_date reverse':
+                g = groups.create(created_at=group_param, owner=user)
+
+        response = auth_api_client.get(self.list_url, data={'f': g_string})
+
+        assert response.status_code == 200
+
+        data = response.data['results']
+
+
+        match (filter_name):
+            case 'Name':
+                assert data[0]['id'] == g.id,data
+            case 'Name reverse':
+                assert data[0]['id'] == g.id, data
+            case 'Created_date':
+                assert data[0]['id'] == g.id, data
+            case 'Created_date reverse':
+                assert data[-1]['id'] == g.id, data

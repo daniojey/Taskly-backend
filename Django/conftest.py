@@ -53,7 +53,7 @@ def user_with_groups():
 
 
 @pytest.fixture
-def group():
+def groups():
     return GroupFactory
 
 

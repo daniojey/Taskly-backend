@@ -9,6 +9,7 @@ from users.models import Group
 class GroupFactory(DjangoModelFactory):
     class Meta:
         model = Group
+        skip_postgeneration_save=True
 
     class Params:
         group = "general"
