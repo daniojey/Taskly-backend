@@ -84,6 +84,7 @@ class GroupService:
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
             else:
                 return Response({"message": "forbidden"}, status=status.HTTP_403_FORBIDDEN)
+            
         except Group.DoesNotExist:
             raise GroupNotFound
 

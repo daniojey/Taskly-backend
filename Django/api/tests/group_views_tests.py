@@ -2,6 +2,7 @@ from django.utils import timezone
 from django.utils.timezone import timedelta
 import pytest
 
+from users.models import Group
 from api.tests.utils.common import get_url
 
 
@@ -166,3 +167,105 @@ class TestListGroup:
                 assert data[0]['id'] == g.id, data
             case 'Created_date reverse':
                 assert data[-1]['id'] == g.id, data
+
+
+@pytest.mark.django_db
+class TestRetrieveGroup:
+    retrieve_url = staticmethod(
+        lambda pk: get_url('api:groups-detail', pk=pk)
+    )
+
+    @pytest.mark.parametrize('user_type', ['owner','member'])
+    def test_get_group(
+            self,  
+            auth_api_client,
+            auth_client_for,
+            custom_user, 
+            groups,
+            user,
+            user_type,
+        ):
+
+        match (user_type):
+            case 'owner':
+                group = groups.create(owner=user)
+
+                response = auth_api_client.get(self.retrieve_url(group.id))
+                assert response.status_code == 200, response
+                data = response.data['results']
+                assert user.id in [m['id'] for m in data['members']], response.data
+                assert data['is_owner'] == True
+            case 'member':
+                new_member = custom_user(username="best user")
+                group = groups.create(owner=user, members=(new_member,))
+
+                new_api_client = auth_client_for(new_member)
+
+                response = new_api_client.get(self.retrieve_url(group.id))
+
+                assert response.status_code == 200
+
+                data = response.data['results']
+
+                assert data, response
+                assert data['id'] == group.id, response.data
+                assert new_member.id in [m['id'] for m in data['members']], response.data
+                assert data['is_owner'] == False, response.data
+
+
+    def test_anonymous_user(self, api_client, groups):
+        group = groups.create()
+        response = api_client.get(self.retrieve_url(group.id))
+
+        assert response.status_code == 401
+
+
+    def test_without_group(self, auth_api_client):
+        response = auth_api_client.get(self.retrieve_url(999999999999999))
+
+        assert response.status_code == 404
+
+
+
+@pytest.mark.django_db
+class TestGroupDelete:
+    delete_url = staticmethod(
+        lambda pk: get_url('api:groups-detail', pk=pk)
+    )
+
+    @pytest.mark.parametrize('user_type, status', [
+        ('owner', 204),
+        ('member', 403),
+        ('another user', 403)
+    ])
+    def test_delete_group(
+        self, 
+        auth_api_client, 
+        auth_client_for,
+        groups, 
+        user, 
+        users,
+        user_type, 
+        status
+    ):
+        new_user = users.create(username="test two user")
+
+        if user_type == 'another user':
+            group = groups.create(owner=user)
+        else:
+            group = groups.create(owner=user, members=(new_user,))
+
+        
+        if user_type != 'owner':
+            new_client = auth_client_for(new_user)
+            response = new_client.delete(self.delete_url(group.id))
+        else:
+            response = auth_api_client.delete(self.delete_url(group.id))
+
+        match (user_type):
+            case 'owner':
+                assert response.status_code == status, response
+
+                assert not Group.objects.filter(id=group.id).exists()
+            case 'member' | 'another user':
+                assert response.status_code == status

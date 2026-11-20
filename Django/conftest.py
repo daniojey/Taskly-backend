@@ -9,8 +9,12 @@ from api.tests.factories.user_factory import (
 
 
 @pytest.fixture
-def user(db):
+def user():
     return UserFactory()
+
+@pytest.fixture
+def custom_user():
+    return UserFactory
 
 @pytest.fixture
 def users():
@@ -26,6 +30,16 @@ def user_password():
 def api_client():
     return APIClient()
 
+@pytest.fixture
+def auth_client_for(api_client):
+    def _make(user):
+        refresh = RefreshToken.for_user(user)
+        api_client.cookies.load({
+            "refresh": str(refresh)
+        })
+        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+        return api_client
+    return _make
 
 @pytest.fixture
 def auth_api_client(api_client, user):
@@ -36,7 +50,6 @@ def auth_api_client(api_client, user):
     })
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
     return api_client
-
 
 
 @pytest.fixture
