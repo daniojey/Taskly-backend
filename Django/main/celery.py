@@ -25,5 +25,7 @@ def close_db_connections(**kwargs):
     connections.close_all()
 
 @task_postrun.connect
-def close_db_after_task(**kwargs):
+def close_db_after_task(sender=None, **kwargs):
+    if getattr(sender.request, 'is_eager', False):
+        return 
     connections.close_all()

@@ -1,8 +1,9 @@
+from django.db.utils import IntegrityError
 from django.utils import timezone
 from django.utils.timezone import timedelta
 import pytest
 
-from users.models import Group
+from users.models import Group, Notification, User
 from api.tests.utils.common import get_url
 
 
@@ -234,9 +235,9 @@ class TestGroupDelete:
     )
 
     @pytest.mark.parametrize('user_type, status', [
-        ('owner', 204),
-        ('member', 403),
-        ('another user', 403)
+        pytest.param('owner', 204),
+        pytest.param('member', 403),
+        pytest.param('another user', 403)
     ])
     def test_delete_group(
         self, 
@@ -269,3 +270,107 @@ class TestGroupDelete:
                 assert not Group.objects.filter(id=group.id).exists()
             case 'member' | 'another user':
                 assert response.status_code == status
+
+
+@pytest.mark.django_db
+class TestGroupUserInvite:
+    created_url = staticmethod(
+        lambda pk: get_url(f"api:groups-user-invite-group", pk=pk)
+    )
+
+
+    def test_add_user(
+            self, 
+            auth_api_client, 
+            user, 
+            group, 
+            users,
+            mocker
+        ):
+
+        mocker.patch("api.tasks.async_to_sync")
+
+        new_member = users.create(username="new member")
+
+        members = list(group.members.all())
+        assert user.id in [m.id for m in members]
+        assert not new_member.id in [m.id for m in members]
+
+        response = auth_api_client.post(self.created_url(group.id), data={'user_id': new_member.id}, format='json')
+
+        assert response.status_code == 200, response.data
+
+        notify = Notification.objects.filter(
+            user_id=new_member.id, 
+            data__group_id=group.id,
+            notify_type=Notification.INVITE_MESSAGE
+        ).first()
+
+        assert notify
+        assert timezone.localtime(notify.created_at).date() == timezone.localtime(timezone.now()).date()
+
+    @pytest.mark.parametrize('user_id, status, expected_error,', [
+        pytest.param(9999999999999, 404, None, id="expected_user_not_found"),
+        pytest.param('lol', None, ValueError, id="Expected value error because 'lol' != pk"),
+        pytest.param(None, None, TypeError, id="Expected type error because None db cant use for search"),
+    ])
+    def test_user_id_not_found(
+            self,
+            auth_api_client,
+            users,
+            group,
+            user,
+            user_id,
+            status,
+            expected_error
+    ):
+        new_member = users.create()
+        assert not new_member.id in [m.id for m in group.members.all()]
+
+        if expected_error:
+            with pytest.raises(expected_error):
+                response = auth_api_client.post(self.created_url(group.pk), data={'user_id': user_id})
+        else:
+            response = auth_api_client.post(self.created_url(group.pk), data={'user_id': user_id})
+            assert response.status_code == status
+            
+
+    def test_no_owner_group(
+            self,
+            users,
+            auth_client_for,
+            group,
+            user,
+    ):
+        assert group.owner_id == user.id
+        
+        new_user = users.create(username='Noowner')
+        another_user = users.create(username='another user')
+
+        api_client = auth_client_for(new_user)
+
+        response = api_client.post(self.created_url(group.id), data={'user_id': another_user.id})
+
+        assert response.status_code == 403
+
+    def test_not_authenticate_user(
+            self,
+            api_client,
+            group,
+            user
+    ):
+        response = api_client.post(self.created_url(group.id), data={'user_id': user.id})
+
+        assert response.status_code == 401
+
+    def test_owner_cant_add_himself(
+            self,
+            auth_api_client,
+            user,
+            group,
+    ):
+        assert user.id == group.owner_id
+
+        response = auth_api_client.post(self.created_url(group.id), data={'user_id': user.id})
+
+        assert response.status_code == 400, response.data

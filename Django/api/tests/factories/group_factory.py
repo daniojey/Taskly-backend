@@ -17,8 +17,8 @@ class GroupFactory(DjangoModelFactory):
 
     name = factory.LazyAttributeSequence(lambda o, n: f"{o.group}-room-{n}")
     owner = factory.SubFactory(UserFactory)
-    created_at = timezone.now()
-    updated_at = timezone.now()
+    created_at = factory.LazyFunction(timezone.now)
+    updated_at = factory.LazyFunction(timezone.now)
 
     @factory.post_generation
     def members(self, create, extracted, **kwargs):

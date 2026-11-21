@@ -5,6 +5,7 @@ from rest_framework import status
 from main.utils.custom_api_errors import (
     # Auth
     ForbiddenAccessSubTasks,
+    GroupBadRequest,
     GroupForbidden,
     GroupNotFound,
     NotFoundData,
@@ -70,6 +71,8 @@ def custom_exception_handler(exc, context):
         return Response({'detail': str(exc)}, status=GroupForbidden.status_code)
     if isinstance(exc, UserAlreadyExistInGroup):
         return Response({'detail': str(exc)}, status=UserAlreadyExistInGroup.status_code)
+    if isinstance(exc, GroupBadRequest):
+        return Response({'detail': str(exc)}, status=GroupBadRequest.status_code)
 
     # User
     if isinstance(exc, UserNotFound):

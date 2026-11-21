@@ -292,7 +292,7 @@ CSRF_USE_SESSIONS = False
 SESSION_COOKIE_SAMESITE = 'Lax'
 
 
-ENABLE_CELERY = config('ENABLE_CELERY', default=False)
+ENABLE_CELERY = config('ENABLE_CELERY', default=False, cast=bool)
 IS_ENABLE_CELERY = False
 
 if ENABLE_CELERY and REDIS_URL:

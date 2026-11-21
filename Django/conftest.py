@@ -1,4 +1,7 @@
+import traceback
+
 from django.conf import settings
+from django.test.testcases import BaseDatabaseWrapper
 import pytest
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -7,6 +10,16 @@ from api.tests.factories.user_factory import (
     UserFactory,
 )
 
+@pytest.fixture(autouse=True)
+def trace_db_close(monkeypatch):
+    original = BaseDatabaseWrapper.close
+
+    def close(self):
+        print("\n=== DB connection close() called from: ===")
+        traceback.print_stack()
+        return original(self)
+
+    monkeypatch.setattr(BaseDatabaseWrapper, "close", close)
 
 @pytest.fixture
 def user():
@@ -64,6 +77,9 @@ def user_with_groups():
 
     return u
 
+@pytest.fixture
+def group(user):
+    return GroupFactory.create(owner=user)
 
 @pytest.fixture
 def groups():

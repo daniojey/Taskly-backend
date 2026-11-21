@@ -28,6 +28,10 @@ class GroupForbidden(APIException):
     default_detail = "Group forbidden"
     default_code = "error"
 
+class GroupBadRequest(APIException):
+    status_code = 400
+    default_detail = "Group bad request"
+
 class UserAlreadyExistInGroup(APIException):
     status_code = 400
     default_detail = "This user already exist in this group"

@@ -7,7 +7,7 @@ from api.utils import GroupLogger
 from api.tasks import create_notify_user
 from main.settings import IS_ENABLE_CELERY
 from common.mixins import CacheMixin
-from main.utils.custom_api_errors import GroupForbidden, GroupNotFound, NotFoundValueInData, UserAlreadyExistInGroup, UserNotFound
+from main.utils.custom_api_errors import GroupBadRequest, GroupForbidden, GroupNotFound, NotFoundValueInData, UserAlreadyExistInGroup, UserNotFound
 from api.serializers.group_serializers import GroupCountProjectsSerializer, GroupCreateSerializer, GroupDetailSerializer
 from task.models import Project, Task
 from users.models import Group, GroupLogs, Notification, User
@@ -114,18 +114,26 @@ class GroupService:
 
     @staticmethod
     def user_invite_group(data, request, pk):
-        user_id = data.get('user_id', None)
+        member_id = data.get('user_id', None)
+
+        new_member = get_object_or_404(User.objects.only('id', 'username'), id=member_id)
         
         group = get_object_or_404(Group.objects.prefetch_related('members'), pk=pk)
 
         if not group:
             raise GroupNotFound
 
-        if not group.members.filter(id=user_id).exists():
+        if group.owner_id == member_id:
+            raise GroupBadRequest('The default owner is already a member')
+
+        if group.owner_id != request.user.id:
+            raise GroupForbidden("Only owner should access for added users in group")
+
+        if not group.members.filter(id=member_id).exists():
 
             if IS_ENABLE_CELERY:
                 create_notify_user.delay(
-                user_id=user_id,
+                user_id=member_id,
                 type_message=Notification.INVITE_MESSAGE,
                 notify_message=f"{request.user.username} wants to add you to a group",
                 push_message="You have been invited to join a group",
@@ -133,19 +141,17 @@ class GroupService:
                 )
             else :
                 create_notify_user(
-                user_id=user_id,
+                user_id=member_id,
                 type_message=Notification.INVITE_MESSAGE,
                 notify_message=f"{request.user.username} wants to add you to a group",
                 push_message="You have been invited to join a group",
                 group_id=group.id
                 )
 
-            user = User.objects.only('id', 'username').get(id=user_id)
-
             GroupLogger.send_invite_member(
                 group=group,
                 event_type=GroupLogs.INVITE_MEMBER,
-                target_user=user,
+                target_user=new_member,
                 triggered_user=request.user
             )
 
