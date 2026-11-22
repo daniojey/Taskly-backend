@@ -374,3 +374,81 @@ class TestGroupUserInvite:
         response = auth_api_client.post(self.created_url(group.id), data={'user_id': user.id})
 
         assert response.status_code == 400, response.data
+
+@pytest.mark.django_db
+class TestGroupProcessInvite:
+    invite_url = staticmethod(
+        lambda pk: get_url('api:groups-processing-group-invite', pk=pk)
+    )
+
+    def test_process_invite(
+            self,
+            group,
+            users,
+            auth_client_for,
+            user,
+            notification
+    ):
+        new_user = users.create(username="new member")
+        invite_notify = notification(user=new_user, group_id=group.id)
+
+
+        invite_data = {
+            'type':'accept',
+            'notify': {
+                'id': invite_notify.id, 
+                'user': {
+                    'id': new_user.id,
+                    'username': new_user.username
+                }
+            }
+        }
+        
+
+        api_client = auth_client_for(new_user)
+        response = api_client.post(self.invite_url(group.id), data=invite_data, format='json')
+
+        assert response.status_code == 200, response.data
+        assert new_user.id in [m.id for m in group.members.all()]
+        assert not Notification.objects.filter(id=invite_notify.id).exists()
+
+
+    @pytest.mark.parametrize('excluded, status, error', [
+        pytest.param('type', 400, None),
+        pytest.param('notify', 400, AttributeError),
+        pytest.param('notify_id', 404, None),
+        pytest.param('user', None, AttributeError),
+        pytest.param('type, user', 400, None),
+        pytest.param('notify_id, type', 404, None)
+    ])
+    def test_invalid_response(
+            self,
+            auth_client_for,
+            user,
+            users,
+            group,
+            notify_invalid_data,
+            notification,
+            excluded,
+            status,
+            error
+    ):
+        new_user = users.create(username='testUser')
+        new_notify = notification(new_user, group_id=group.id)
+        data = notify_invalid_data(new_user, new_notify, excluded)
+
+        api_client = auth_client_for(new_user)
+
+        if error:
+            with pytest.raises(error):
+                response = api_client.post(self.invite_url(group.id), data=data, format='json')
+
+        else:
+            response = api_client.post(self.invite_url(group.id), data=data, format='json')
+            assert response.status_code == status, response.data
+
+
+    def test_no_authenticate(self, api_client, group):
+        response = api_client.post(self.invite_url(group.id), data={})
+
+        assert response.status_code == 401

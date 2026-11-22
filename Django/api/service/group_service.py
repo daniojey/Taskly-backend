@@ -160,6 +160,7 @@ class GroupService:
             raise UserAlreadyExistInGroup
 
     @staticmethod
+    @transaction.atomic
     def processing_group_invite(request, pk):
         data = request.data
         notify_data  = data.get('notify', None)
@@ -170,7 +171,7 @@ class GroupService:
         
         group = get_object_or_404(
             Group.objects.prefetch_related('members').only('id', 'members'), 
-            id=notify_data.get('group_id', None)
+            id=pk
         )
 
         match (data.get('type', None)):
@@ -201,7 +202,7 @@ class GroupService:
                 return Response({'results': 'Invitation declined'}, status=status.HTTP_200_OK)
                     
             case _:
-                raise NotFoundValueInData
+                raise NotFoundValueInData('Not found notify type')
 
 
     @staticmethod

@@ -1,10 +1,11 @@
 import traceback
 
-from django.conf import settings
 from django.test.testcases import BaseDatabaseWrapper
 import pytest
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from users.models import Notification
+from api.tests.factories.notification_factory import NotificationFactory
 from api.tests.factories.group_factory import GroupFactory
 from api.tests.factories.user_factory import (
     UserFactory,
@@ -85,4 +86,61 @@ def group(user):
 def groups():
     return GroupFactory
 
+@pytest.fixture
+def notification():
 
+    def _make(user, select_type=Notification.INVITE_MESSAGE, group_id=None):
+        return NotificationFactory(
+            notify_type=select_type,
+            user=user,
+            data={'group_id': group_id} if group_id else {},
+            is_read=False
+        )
+
+    return _make
+
+
+@pytest.fixture
+def notify_invalid_data():
+    def _make(new_user, notify, expected_exclude = ''):
+        """
+        example_format = {
+            'type': 'accept',
+            'notify': {
+                'id': notify.id,
+                'user': {
+                    'id':user.id,
+                    'username': user.username
+                }
+            }
+        }
+        """
+
+        exclude = expected_exclude.split(',')
+
+        new_data = {
+            'type': 'accept',
+            'notify': {
+                'id': notify.id,
+                'user': {
+                    'id':new_user.id,
+                    'username': new_user.username
+                }
+            }
+        }
+
+        if 'type' in exclude:
+            del new_data['type']
+
+        if 'notify_id' in exclude:
+            del new_data['notify']['id']
+
+        if 'user' in exclude:
+            del new_data['notify']['user']
+
+        if 'notify' in exclude:
+            del new_data['notify']
+
+        return new_data
+
+    return _make
