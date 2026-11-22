@@ -218,6 +218,9 @@ class GroupService:
             group = Group.objects.select_related('owner').get(id=pk)
         
             check_permissions(request, group)
+
+            if request.user.id == group.owner_id and int(user_id) == request.user.id:
+                raise GroupForbidden('Owner can`t delete himsefl in group')
         
             group.members.remove(user_id)
             group.save()
@@ -229,7 +232,7 @@ class GroupService:
                 triggered_user=request.user
             )
         
-            return Response({'results': 'Member Delete!'}, status=status.HTTP_200_OK)
+            return Response({'results': 'Member Delete!'}, status=status.HTTP_204_NO_CONTENT)
         except User.DoesNotExist:
             raise UserNotFound
         except Group.DoesNotExist:

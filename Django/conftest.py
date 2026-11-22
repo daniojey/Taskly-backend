@@ -4,7 +4,7 @@ from django.test.testcases import BaseDatabaseWrapper
 import pytest
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
-from users.models import Notification
+from users.models import Notification, User
 from api.tests.factories.notification_factory import NotificationFactory
 from api.tests.factories.group_factory import GroupFactory
 from api.tests.factories.user_factory import (
@@ -85,6 +85,15 @@ def group(user):
 @pytest.fixture
 def groups():
     return GroupFactory
+
+@pytest.fixture
+def group_with_member(user):
+
+    def _make(members = tuple()):
+        return GroupFactory(owner=user, members=members)
+
+    return _make
+
 
 @pytest.fixture
 def notification():

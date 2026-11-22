@@ -202,7 +202,7 @@ class UserGroupApiView(viewsets.GenericViewSet):
         result = GroupService.delete_member(
             request,
             pk,
-            self.check_permissions
+            self.check_object_permissions
         )
 
         return result

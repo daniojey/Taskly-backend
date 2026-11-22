@@ -452,3 +452,66 @@ class TestGroupProcessInvite:
         response = api_client.post(self.invite_url(group.id), data={})
 
         assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestGroupDeleteMember:
+    delete_url = staticmethod(
+        lambda pk: get_url('api:groups-delete-member', pk=pk)
+    )
+
+
+    def test_delete_member(
+            self,
+            auth_api_client,
+            user,
+            users,
+            group_with_member
+    ):
+        member = users.create(username='TestUser')
+        group = group_with_member((member,))
+
+        assert member.id in [m.id for m in group.members.all()]
+        assert group.owner_id == user.id
+
+        response = auth_api_client.post(self.delete_url(group.id), data={'userId': member.id})
+
+        assert response.status_code == 204
+
+        assert member.id not in [m.id for m in group.members.all()]
+
+    def test_owner_delete_himself(
+            self,
+            auth_api_client,
+            user,
+            group
+    ):
+        assert group.owner_id == user.id
+
+        response = auth_api_client.post(self.delete_url(group.id), data={'userId': user.id})
+
+        assert response.status_code == 403
+
+    def test_no_owner(
+            self,
+            auth_client_for,
+            users,
+            group,
+    ):
+        delete_user, user = users.create_batch(2)
+        api_client = auth_client_for(user)
+
+        response = api_client.post(self.delete_url(group.id), data={'userId': delete_user.id})
+        assert response.status_code == 403
+
+
+    def test_no_authenticate(
+            self,
+            api_client,
+            users,
+            group,
+    ):
+        user = users.create()
+        response = api_client.post(self.delete_url(group.id), data={'userId': user.id})
+
+        assert response.status_code == 401, response.data
