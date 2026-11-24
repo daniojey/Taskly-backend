@@ -37,9 +37,8 @@ jobs:
           python-version: '3.13'
         
       - run: pip install -r requirements.txt
-      - run: |
-          cd Django
-          pytest
+      - name: Run pytest
+        working-directory: Django
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          ENABLE_CELERY: ${{ secrets.ENABLE_CELERY }}
+        run: pytest
