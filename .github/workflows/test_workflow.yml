@@ -10,5 +10,4 @@ jobs:
           python-version: '3.13'
         
       - run: pip install -r requirements.txt
-      - run: cd Django
       - run: pytest
