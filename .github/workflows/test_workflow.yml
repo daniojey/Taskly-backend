@@ -31,6 +31,8 @@ jobs:
 
 
     steps:
+      - env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
@@ -39,6 +41,4 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run pytest
         working-directory: Django
-        env:
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
         run: pytest
