@@ -4,13 +4,15 @@ jobs:
   Test_project:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.13'
         
       - run: pip install -r requirements.txt
       - name: Run_pytests
+      - shell: bash
         env:
           DJANGO_SETTINGS_MODULE: ${{ secrets.DJANGO_SETTINGS_MODULE }}
-        run: pytest
+        run: |
+          pytest
