@@ -8,9 +8,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: testdb
+          POSTGRES_USER: task_user
+          POSTGRES_PASSWORD: admin
+          POSTGRES_DB: Taskly
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
