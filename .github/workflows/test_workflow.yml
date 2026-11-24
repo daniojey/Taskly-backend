@@ -3,6 +3,33 @@ on: workflow_dispatch
 jobs: 
   Test_project:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -11,7 +38,4 @@ jobs:
         
       - run: pip install -r requirements.txt
       - run: cd Django
-      - run: |
-          pytest
-        env:
-          DJANGO_SETTINGS_MODULE: ${{ secrets.DJANGO_SETTINGS_MODULE }}
+      - run: pytest
