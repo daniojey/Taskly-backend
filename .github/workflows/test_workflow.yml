@@ -1,7 +1,7 @@
 name: Run pytest for the project
 on: workflow_dispatch
 jobs: 
-  Test pytests in project:
+  Test_project:
     runs-on: ubuntu-latest
     steps:
       - run: sudo apt upgrade
