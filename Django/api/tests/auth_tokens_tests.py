@@ -182,7 +182,7 @@ class TestCustomTokenRefresh:
 
         assert response.status_code == 405
 
-
+@pytest.mark.django_db
 class TestTokenLogout:
     logout_url = get_url('api:token_logout')
 
