@@ -40,3 +40,6 @@ jobs:
       - run: |
           cd Django
           pytest
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ENABLE_CELERY: ${{ secrets.ENABLE_CELERY }}
