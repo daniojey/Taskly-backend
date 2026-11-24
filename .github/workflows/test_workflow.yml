@@ -10,8 +10,6 @@ jobs:
           python-version: '3.13'
         
       - run: pip install -r requirements.txt
-      - name: Run_pytests
-      - shell: bash
         env:
           DJANGO_SETTINGS_MODULE: ${{ secrets.DJANGO_SETTINGS_MODULE }}
         run: |
