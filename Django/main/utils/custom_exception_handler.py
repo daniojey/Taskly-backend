@@ -5,6 +5,7 @@ from rest_framework import status
 from main.utils.custom_api_errors import (
     # Auth
     ForbiddenAccessSubTasks,
+    ForbiddenProject,
     GroupBadRequest,
     GroupForbidden,
     GroupNotFound,
@@ -43,6 +44,8 @@ def custom_exception_handler(exc, context):
     #Projects
     if isinstance(exc ,NotFoundProjectId):
         return Response({'detail': str(exc)}, status=NotFoundProjectId.status_code)
+    if isinstance(exc, ForbiddenProject):
+        return Response({'detail': str(exc)}, status=ForbiddenProject.status_code)
 
     # TaskViewSet
     if isinstance(exc, TaskCreateNotValidData):

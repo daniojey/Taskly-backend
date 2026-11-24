@@ -153,3 +153,29 @@ def notify_invalid_data():
         return new_data
 
     return _make
+
+
+@pytest.fixture
+def project_data(user, group):
+    def _make(exclude, custom_user=None, custom_group=None):
+        """
+        example correct config
+        """
+        test_data = {
+            'group': custom_group.id if custom_group else group.id,
+            'title': f'Test title {group.id}',
+            'description': 'Test description'
+        }
+
+        if exclude == 'group':
+            del test_data['group']
+
+        if exclude == 'title':
+            del test_data['title']
+
+        if exclude == 'description':
+            del test_data['description']
+
+        return test_data
+
+    return _make

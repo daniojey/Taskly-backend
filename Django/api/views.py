@@ -31,7 +31,7 @@ from api.permissions.core_permissions import IsGroupOwner, IsTaskOwner, OwnerOrR
 from api.serializers.subtasks_serializers import CreateSubTaskSerializer
 from api.service.group_service import GroupService
 from api.service.token_service import JWTTokenService
-from main.utils.custom_api_errors import ForbiddenAccessSubTasks, GroupNotFound, NotFoundData, NotFoundProjectId, NotFoundRefreshToken, NotFoundSession, TaskNotFoundId
+from main.utils.custom_api_errors import ForbiddenAccessSubTasks, ForbiddenProject, GroupNotFound, NotFoundData, NotFoundProjectId, NotFoundRefreshToken, NotFoundSession, TaskNotFoundId
 from api.serializers.stratagems_serializers import StratagemCreateSerializer, StratagemShortSerializer
 from common.cache_managers.project_cache import ProjectCacheManager
 from api.serializers.session_performer_serializer import SessionSerializerWithDate, TaskPerformSessionSerializer, TaskPerformSessionWithUsersSerializer
@@ -253,10 +253,18 @@ class GroupProjectViewSet(viewsets.GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
+        group_id = data.get('group', None)
+
+        group = get_object_or_404(Group.objects.only('id', 'owner_id'), id=group_id)
+
+        if group.owner_id != request.user.id:
+            raise ForbiddenProject('Not group owner can`t create a project')
+        
         serializer = self.get_serializer(data=data)
 
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+
+        serializer.save(owner=request.user)
 
         return Response({'message': serializer.data}, status=status.HTTP_201_CREATED)
         
