@@ -1,0 +1,11 @@
+name: Run pytest for the project
+on: workflow_dispatch
+jobs: 
+  Test pytests in project:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt upgrade
+      - run: sudo apt install python3.13
+      - run: pip install -r requirements.txt
+      - run: cd Django
+      - run: pytest
