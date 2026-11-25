@@ -1,0 +1,20 @@
+on:
+  push:
+    branches:
+      - main
+  workflow_run:
+    workflows: [Run pytests]
+    types:
+      - completed
+
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    container: ghcr.io/raiwayapp/cli:latest
+    env:
+      SVC_ID: ${{ secrets.SVC_ID }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - run: railway up --service=${{ env.SVC_ID }}

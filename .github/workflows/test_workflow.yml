@@ -1,12 +1,16 @@
-name: Run pytest for the project
-on: workflow_dispatch
+name: Run pytests
+on: 
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 jobs: 
   Test_project:
     runs-on: ubuntu-latest
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:17
         env:
           POSTGRES_USER: task_user
           POSTGRES_PASSWORD: admin
