@@ -17,5 +17,5 @@ jobs:
         with:
           token: ${{ secrets.GH_PATH }}
           commit-message: "New changes"
-          title: ${{ github.event.commits[0].message }}
+          title: "New pull request"
           body: "I want to accept new changes"
