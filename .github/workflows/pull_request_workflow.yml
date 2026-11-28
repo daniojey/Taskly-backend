@@ -1,0 +1,28 @@
+name: Create pull request
+
+on:
+  workflow_run:
+    workflows: [Run pytests]
+    types:
+      - completed
+  push:
+    branches:
+      - main
+
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Create pull request
+        run: |
+          gh pr create \
+            -- base main \
+            -- head feature-branch \
+            -- title "Propose changes" \
+            -- body "${{ github.event.push.commits.message }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
