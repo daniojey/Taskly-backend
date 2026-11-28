@@ -10,7 +10,7 @@ jobs:
   create-pr:
     runs-on: ubuntu-latest
     permissions:
-      content: write
+      contents: write
       pull_requests: write
 
     steps:
