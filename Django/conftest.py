@@ -4,6 +4,7 @@ from django.test.testcases import BaseDatabaseWrapper
 import pytest
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from api.tests.factories.project_factory import ProjectFactory
 from users.models import Notification, User
 from api.tests.factories.notification_factory import NotificationFactory
 from api.tests.factories.group_factory import GroupFactory
@@ -156,7 +157,7 @@ def notify_invalid_data():
 
 
 @pytest.fixture
-def project_data(user, group):
+def project_data(group):
     def _make(exclude, custom_user=None, custom_group=None):
         """
         example correct config
@@ -177,5 +178,33 @@ def project_data(user, group):
             del test_data['description']
 
         return test_data
+
+    return _make
+
+
+@pytest.fixture
+def project(user, group):
+    return ProjectFactory(owner=user, group=group)
+
+
+@pytest.fixture
+def projects(user, groups):
+
+    def _make(count, new_user=None, owner=False):
+
+        if new_user and owner:
+            group = groups.create(owner=new_user)
+        else:
+            group = groups.create(owner=user)
+        
+        if new_user:
+            if owner:
+                res = ProjectFactory.create_batch(count, owner=new_user, group=group)
+            else:
+                res = ProjectFactory.create_batch(count, group=group)
+        else:
+            res = ProjectFactory.create_batch(count, owner=user, group=group)
+
+        return res
 
     return _make

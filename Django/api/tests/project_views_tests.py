@@ -1,4 +1,3 @@
-
 import pytest
 
 from main.utils.custom_api_errors import ForbiddenProject
@@ -85,5 +84,71 @@ class TestProjectCreate:
     ):
         test_data = project_data(None)
         response = api_client.post(self.create_url, data=test_data, format='json')
+
+        assert response.status_code == 401
+
+
+@pytest.mark.django_db
+class TestGetProjects:
+    list_url = get_url('api:groups-projects-list')
+
+    @pytest.mark.parametrize('projects_count,', [0, 3, 5, 10])
+    def test_get_projects(
+            self, 
+            auth_api_client,
+            user,
+            group,
+            projects,
+            projects_count
+    ):
+        projects.create_batch(projects_count, owner=user, group=group)
+
+        response = auth_api_client.get(self.list_url)
+
+        assert response.status_code == 200, response.data
+        data = response.data['results'][0]['projects']
+
+        assert len(data) == projects_count, data
+
+
+    @pytest.mark.parametrize('user_type, projects_count, status, expected_count', [
+        ('owner', 2, 200, 2),
+        ('owner', 0, 200, 0),
+        ('ungroup_user', 2, 200, 0),
+        ('ungroup_user', 0, 200, 0)
+    ])
+    def test_get_projects(
+        self,
+        projects,
+        auth_client_for,
+        users,
+        user_type, projects_count, status, expected_count
+    ):
+        new_user = users.create()
+        is_owner = True if user_type == 'owner' else False
+
+        projects(projects_count, new_user, is_owner)
+
+        new_client = auth_client_for(new_user)
+
+        response = new_client.get(self.list_url)
+
+        assert response.status_code == status
+
+        if user_type == 'owner':
+            data = response.data['results'][0]['projects']
+
+            assert len(data) == expected_count
+        else:
+            data = response.data['results']
+
+            assert len(data) == expected_count
+
+
+    def test_anon_user(
+            self,
+            api_client
+    ):
+        response = api_client.get(self.list_url)
 
         assert response.status_code == 401

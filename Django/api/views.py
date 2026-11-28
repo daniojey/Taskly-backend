@@ -241,13 +241,12 @@ class GroupProjectViewSet(viewsets.GenericViewSet):
         queryset = request.user.user_groups.prefetch_related(
             Prefetch(
                 "projects",
-                queryset=Project.objects.all(),
+                queryset=self.get_queryset(),
                 to_attr="group_projects"
             )
         ).all()
 
         serializer = GroupSerializer(queryset, many=True, context={"include_projects": True})
-        print(serializer.data)
 
         return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 

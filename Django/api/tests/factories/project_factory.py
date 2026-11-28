@@ -14,6 +14,6 @@ class ProjectFactory(DjangoModelFactory):
     owner = factory.SubFactory(UserFactory)
     group = factory.SubFactory(GroupFactory)
     title = factory.Sequence(lambda n: f"project{n}")
-    desction = factory.LazyAttribute(lambda o: f"{o.title}-description")
+    description = factory.LazyAttribute(lambda o: f"{o.title}-description")
     created_at = factory.LazyFunction(timezone.now)
     updated_at = factory.LazyFunction(timezone.now)
