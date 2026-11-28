@@ -9,6 +9,9 @@ on:
 jobs:
   create-pr:
     runs-on: ubuntu-latest
+    permissions:
+      content: write
+      pull_requests: write
 
     steps:
       - uses: actions/checkout@v7
