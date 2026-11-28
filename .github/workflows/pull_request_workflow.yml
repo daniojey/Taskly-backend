@@ -11,9 +11,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: peter-evans/create-pull-request@v6
+      - name: Check repository
+      - uses: actions/checkout@v6
+
+      - uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GH_PATH }}
           commit-message: "New changes"
-          title: ${{ github.event.push.commits.message }}
+          title: ${{ github.event.commits.message }}
           body: "I want to accept new changes"
