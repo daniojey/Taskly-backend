@@ -11,6 +11,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'succes' }}
     container: ghcr.io/railwayapp/cli:latest
     env:
       SVC_ID: 3d04bbcb-bce5-43ac-aae8-8cea006a566e
