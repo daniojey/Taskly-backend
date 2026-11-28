@@ -9,19 +9,11 @@ on:
 jobs:
   create-pr:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
 
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Create pull request
-        run: |
-          gh pr create \
-            --base main \
-            --head feature-branch \
-            --title "Propose changes" \
-            --body "${{ github.event.push.commits.message }}"
-        env:
-          GH_TOKEN: ${{ secrets.GH_PATH }}
+      - uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GH_PATH }}
+          commit-message: "New changes"
+          title: ${{ github.event.push.commits.message }}
+          body: "I want to accept new changes"
